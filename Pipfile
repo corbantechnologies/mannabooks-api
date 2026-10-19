@@ -1,0 +1,32 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+django = "~=5.2"
+djangorestframework = "*"
+djangorestframework-simplejwt = "*"
+django-cors-headers = "*"
+django-filter = "*"
+drf-spectacular = "*"
+dj-database-url = "*"
+psycopg = {extras = ["binary"], version = "*"}
+gunicorn = "*"
+whitenoise = "*"
+celery = {extras = ["redis"], version = "*"}
+python-dotenv = "*"
+google-auth = "*"
+requests = "*"
+cryptography = "*"
+
+[dev-packages]
+pytest = "*"
+pytest-django = "*"
+ruff = "*"
+
+[scripts]
+dev = "python manage.py runserver"
+test = "pytest -q"
+lint = "ruff check ."
+schema = "python manage.py spectacular --file schema.yml --validate"

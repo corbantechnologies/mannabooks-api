@@ -1,0 +1,6 @@
+from django.apps import AppConfig
+
+
+class InvitationsConfig(AppConfig):
+    name = "apps.invitations"
+    label = "invitations"

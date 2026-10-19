@@ -1,0 +1,52 @@
+from rest_framework import serializers
+
+from apps.core.catalog import DEPARTMENT_MODULES
+from apps.employees.models import Employee
+
+from .models import Department
+
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    head_id = serializers.PrimaryKeyRelatedField(
+        source="head", queryset=Employee.objects.none(), allow_null=True, required=False
+    )
+    head_name = serializers.CharField(source="head.full_name", read_only=True, default=None)
+    employee_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = Department
+        fields = [
+            "id", "name", "code", "description", "head_id", "head_name", "modules", "is_active",
+            "employee_count", "created_at",
+        ]
+        read_only_fields = ["id", "head_name", "employee_count", "created_at"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        workspace = self.context.get("workspace")
+        if workspace is not None:
+            self.fields["head_id"].queryset = Employee.objects.filter(workspace=workspace)
+
+    def validate_name(self, value):
+        value = value.strip()
+        clash = Department.objects.filter(workspace=self.context["workspace"], name__iexact=value)
+        if self.instance:
+            clash = clash.exclude(pk=self.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError("A department with this name already exists.")
+        return value
+
+    def validate_modules(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Send a list of module keys.")
+        unknown = [m for m in value if m not in DEPARTMENT_MODULES]
+        if unknown:
+            raise serializers.ValidationError(f"Unknown modules: {', '.join(unknown)}.")
+        # One in-charge per module: a module belongs to one department only.
+        taken = Department.objects.filter(workspace=self.context["workspace"], is_active=True)
+        if self.instance:
+            taken = taken.exclude(pk=self.instance.pk)
+        clashes = [f"{DEPARTMENT_MODULES[m]} ({d.name})" for d in taken for m in value if m in d.modules]
+        if clashes:
+            raise serializers.ValidationError(f"Already run by another department: {', '.join(clashes)}.")
+        return sorted(set(value))

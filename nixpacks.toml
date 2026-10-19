@@ -1,0 +1,4 @@
+# Railway builds with Nixpacks from the Pipfile. Python is pinned here because the Pipfile
+# does not pin it (local machines may run a newer Python).
+[variables]
+NIXPACKS_PYTHON_VERSION = "3.12"
