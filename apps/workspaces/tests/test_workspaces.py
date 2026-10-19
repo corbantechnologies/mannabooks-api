@@ -42,6 +42,23 @@ def test_kra_pin_and_vat_rules(workspace, owner, client_for):
     assert ok.status_code == 200 and ok.data["kra_pin"] == "P051234567X"
 
 
+def test_kra_pin_shapes():
+    import pytest
+    from rest_framework.exceptions import ValidationError
+
+    from apps.core.kra import clean_pin
+
+    assert clean_pin("a123456789b") == "A123456789B"  # a person
+    assert clean_pin(" P051234567X ") == "P051234567X"  # a company
+    assert clean_pin("") == ""
+    with pytest.raises(ValidationError, match="13 characters"):
+        clean_pin("P05123456789Y")  # two digits too many
+    with pytest.raises(ValidationError, match="start with A"):
+        clean_pin("B123456789C")
+    with pytest.raises(ValidationError):
+        clean_pin("", required=True)
+
+
 def test_only_the_owner_deletes(workspace, owner, add_member, client_for):
     admin = add_member(workspace, "admin@example.com", "admin")
     assert client_for(admin).delete(f"/api/v1/w/{workspace.slug}/").status_code == 409

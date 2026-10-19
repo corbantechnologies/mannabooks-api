@@ -3,6 +3,7 @@ from rest_framework import serializers
 from apps.branches.models import Branch
 from apps.core.dimensions import DimensionFields
 from apps.core.fields import WorkspaceRelatedField
+from apps.core.kra import clean_pin
 from apps.core.sales_serializers import ETIMS_FIELDS, SALES_DOCUMENT_FIELDS, SALES_READ_ONLY, SalesLineSerializer
 from apps.customers.models import Customer
 from apps.ledgeraccounts.models import LedgerAccount
@@ -32,6 +33,9 @@ class ReceiptSerializer(DimensionFields, serializers.ModelSerializer):
         ]
         read_only_fields = [f for f in SALES_READ_ONLY if f != "customer_name"] + ETIMS_FIELDS + ["deposit_account_name", "status", "void_reason"]
         extra_kwargs = {"currency": {"required": False}}
+
+    def validate_customer_pin(self, value):
+        return clean_pin(value)
 
 
 class ReceiptVoidSerializer(serializers.Serializer):

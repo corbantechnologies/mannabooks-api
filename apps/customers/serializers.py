@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.core.fields import WorkspaceRelatedField
+from apps.core.kra import clean_pin
 from apps.pricelists.models import PriceList
 
 from .models import Customer
@@ -25,10 +26,7 @@ class CustomerSerializer(serializers.ModelSerializer):
         return str(obj.open_invoices - obj.unallocated_payments - obj.unapplied_credits)
 
     def validate_kra_pin(self, value):
-        value = value.strip().upper()
-        if value and (len(value) != 11 or not value[0].isalpha() or not value[-1].isalpha() or not value[1:-1].isdigit()):
-            raise serializers.ValidationError("A KRA PIN looks like A123456789B.")
-        return value
+        return clean_pin(value)
 
     def validate_currency(self, value):
         value = value.strip().upper()

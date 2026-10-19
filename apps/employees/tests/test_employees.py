@@ -47,4 +47,5 @@ def test_department_head_is_module_in_charge(workspace, owner, client_for):
     clash = api.post(f"/api/v1/w/{workspace.slug}/departments/", {"name": "Procurement", "modules": ["purchasing"]}, format="json")
     assert clash.status_code == 400 and "modules" in clash.data["errors"]
     context = api.get(f"/api/v1/w/{workspace.slug}/context/").data
-    assert context["in_charge_of"] == ["inventory", "purchasing"] and context["department"] is None
+    assert context["in_charge_of"] == ["inventory", "purchasing"]
+    assert context["department"] == "Stores"  # the head joins the department they run

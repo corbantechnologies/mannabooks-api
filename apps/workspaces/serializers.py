@@ -1,5 +1,7 @@
 from rest_framework import serializers
 
+from apps.core.kra import clean_pin
+
 from .models import Workspace
 
 
@@ -14,10 +16,7 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "slug", "created_at"]
 
     def validate_kra_pin(self, value):
-        value = value.strip().upper()
-        if value and (len(value) != 11 or not value[0].isalpha() or not value[-1].isalpha() or not value[1:-1].isdigit()):
-            raise serializers.ValidationError("A KRA PIN looks like A123456789B.")
-        return value
+        return clean_pin(value)
 
     def validate_currency(self, value):
         value = value.strip().upper()

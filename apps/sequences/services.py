@@ -34,6 +34,11 @@ DEFAULTS = {
     "bank_transfer": {"prefix": "BT-", "padding": 4, "include_year": True},
     "project": {"prefix": "PRJ-", "padding": 4, "include_year": False},
     "fixed_asset": {"prefix": "FA-", "padding": 4, "include_year": False},
+    "product": {"prefix": "SKU-", "padding": 5, "include_year": False},
+    "department": {"prefix": "DEP-", "padding": 3, "include_year": False},
+    "cost_center": {"prefix": "CC-", "padding": 3, "include_year": False},
+    "branch": {"prefix": "BR-", "padding": 2, "include_year": False},
+    "warehouse": {"prefix": "WH-", "padding": 2, "include_year": False},
 }
 
 

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.branches.models import Branch
+from apps.core.kra import clean_pin
 from apps.departments.models import Department
 from apps.memberships.models import Membership
 from apps.roles.models import Role
@@ -19,6 +20,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
         source="reports_to", queryset=Employee.objects.none(), allow_null=True, required=False
     )
     reports_to_name = serializers.CharField(source="reports_to.full_name", read_only=True, default=None)
+    reports_to_membership_id = serializers.PrimaryKeyRelatedField(
+        queryset=Membership.objects.none(), write_only=True, required=False, allow_null=True,
+        help_text="A team member without a staff record (such as the owner): one is made for them",
+    )
     membership_id = serializers.PrimaryKeyRelatedField(
         source="membership", queryset=Membership.objects.none(), allow_null=True, required=False
     )
@@ -29,7 +34,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         fields = [
             "id", "staff_number", "first_name", "last_name", "other_names", "full_name", "email", "phone",
             "national_id", "kra_pin", "job_title", "department_id", "department_name", "branch_id",
-            "reports_to_id", "reports_to_name", "membership_id", "has_login", "hire_date", "status", "created_at",
+            "reports_to_id", "reports_to_name", "reports_to_membership_id", "membership_id", "has_login", "hire_date", "status", "created_at",
             "on_payroll", "basic_salary", "recurring_items", "pay_method", "bank_name", "bank_account_number", "mpesa_phone", "nssf_number", "shif_number", "annual_leave_days", "exit_date",
         ]
         read_only_fields = ["id", "staff_number", "full_name", "department_name", "reports_to_name", "has_login", "created_at"]
@@ -76,15 +81,21 @@ class EmployeeSerializer(serializers.ModelSerializer):
             self.fields["branch_id"].queryset = Branch.objects.filter(workspace=workspace)
             self.fields["reports_to_id"].queryset = Employee.objects.filter(workspace=workspace)
             self.fields["membership_id"].queryset = Membership.objects.filter(workspace=workspace)
+            self.fields["reports_to_membership_id"].queryset = Membership.objects.filter(workspace=workspace, status="active")
 
     def get_has_login(self, obj) -> bool:
         return obj.membership_id is not None
 
     def validate_kra_pin(self, value):
-        return value.strip().upper()
+        return clean_pin(value)
 
     def validate(self, attrs):
         attrs = self._strip_pay(attrs)
+        boss_member = attrs.pop("reports_to_membership_id", None)
+        if boss_member is not None:
+            from .services import employee_for_membership
+
+            attrs["reports_to"] = employee_for_membership(boss_member)
         manager = attrs.get("reports_to")
         if manager is not None and self.instance is not None:
             seen, node = set(), manager

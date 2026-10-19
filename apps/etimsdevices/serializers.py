@@ -2,6 +2,7 @@ from django.conf import settings
 from rest_framework import serializers
 
 from apps.core.crypto import encrypt
+from apps.core.kra import clean_pin
 
 from .models import EtimsDevice
 
@@ -27,10 +28,7 @@ class EtimsDeviceSerializer(serializers.ModelSerializer):
         return settings.ETIMS_ENABLED
 
     def validate_kra_pin(self, value):
-        value = value.strip().upper()
-        if len(value) != 11 or not value[0].isalpha() or not value[-1].isalpha() or not value[1:-1].isdigit():
-            raise serializers.ValidationError("A KRA PIN looks like A123456789B.")
-        return value
+        return clean_pin(value, required=True)
 
     def validate(self, attrs):
         key = attrs.pop("communication_key", None)
