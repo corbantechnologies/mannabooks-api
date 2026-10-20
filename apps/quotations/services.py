@@ -78,4 +78,7 @@ def convert(quotation: Quotation, user=None):
     )
     quotation.status = Quotation.Status.CONVERTED
     quotation.save(update_fields=["status", "updated_at"])
+    from apps.deals.services import quotation_converted
+
+    quotation_converted(quotation)
     return invoice

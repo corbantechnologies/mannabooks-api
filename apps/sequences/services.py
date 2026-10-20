@@ -39,6 +39,8 @@ DEFAULTS = {
     "cost_center": {"prefix": "CC-", "padding": 3, "include_year": False},
     "branch": {"prefix": "BR-", "padding": 2, "include_year": False},
     "warehouse": {"prefix": "WH-", "padding": 2, "include_year": False},
+    "lead": {"prefix": "LD-", "padding": 4, "include_year": False},
+    "deal": {"prefix": "DL-", "padding": 4, "include_year": False},
 }
 
 

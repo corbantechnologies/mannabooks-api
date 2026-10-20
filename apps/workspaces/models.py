@@ -28,6 +28,8 @@ class Workspace(BaseModel):
     modules = models.JSONField(default=list, blank=True, help_text="Switched-on modules (keys of APP_MODULES); empty means all")
     business_goal = models.CharField(max_length=20, blank=True, help_text="What the business chose to do first")
     is_active = models.BooleanField(default=True)
+    group = models.ForeignKey("companygroups.CompanyGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="workspaces",
+                              help_text="The company group this business is reported with")
 
     class Meta:
         ordering = ["name"]

@@ -6,14 +6,17 @@ from .models import Workspace
 
 
 class WorkspaceSerializer(serializers.ModelSerializer):
+    group_id = serializers.UUIDField(read_only=True, allow_null=True)
+    group_name = serializers.CharField(source="group.name", read_only=True, default=None)
+
     class Meta:
         model = Workspace
         fields = [
             "id", "name", "slug", "legal_name", "kra_pin", "vat_registered", "vat_number", "currency",
             "country", "timezone", "phone", "email", "address", "logo_url", "fiscal_year_start_month",
-            "modules", "business_goal", "created_at",
+            "modules", "business_goal", "group_id", "group_name", "created_at",
         ]
-        read_only_fields = ["id", "slug", "created_at"]
+        read_only_fields = ["id", "slug", "group_id", "group_name", "created_at"]
 
     def validate_kra_pin(self, value):
         return clean_pin(value)
@@ -97,5 +100,6 @@ class WorkspaceContextSerializer(serializers.Serializer):
     etims_enabled = serializers.BooleanField(help_text="KRA eTIMS signing is switched on for the platform")
     fiscal_years = serializers.ListField(child=serializers.DictField(), help_text="Every financial year, latest first: id, name, start_date, end_date, status")
     unclosed_years = serializers.ListField(child=serializers.CharField(), help_text="Years that have ended but are not closed yet")
+    inbox_new = serializers.IntegerField(help_text="Documents from other businesses waiting in the inbox")
     module_catalog = serializers.ListField(child=serializers.DictField(), help_text="Modules that can be switched on: key, label, description")
     goal_catalog = serializers.ListField(child=serializers.DictField(), help_text="Starting goals: key, label, description, modules")

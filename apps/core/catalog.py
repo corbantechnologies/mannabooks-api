@@ -58,6 +58,9 @@ MODULES: dict[str, dict] = {
     "fixedassets": {"label": "Fixed assets", "actions": ["view", "manage", "depreciate"]},
     "workreports": {"label": "Work reports", "actions": ["request", "view", "manage"]},
     "etims": {"label": "KRA eTIMS", "actions": ["view", "manage"]},
+    # Phase 7: growth
+    "crm": {"label": "CRM (leads, deals and follow-ups)", "actions": ["view", "manage"]},
+    "inbox": {"label": "Business inbox (documents from other MannaBooks businesses)", "actions": ["view", "send", "manage"]},
 }
 
 # Modules a department can run (its head becomes their in-charge). Grows with each phase.
@@ -79,6 +82,7 @@ _SELLING = [
     "customers.*", "products.view", "quotations.*", "invoices.view", "invoices.create", "invoices.issue",
     "payments.view", "payments.create", "receipts.view", "receipts.create", "creditnotes.view",
     "deliverynotes.*", "recurringinvoices.view", "reminders.view", "loyalty.view", "loyalty.enrol", "inventory.view", "projects.view",
+    "crm.*", "inbox.view", "inbox.send",
 ]
 _ACCOUNTING = [
     "ledgeraccounts.*", "journals.*", "fiscalyears.*", "periods.*", "currencies.*", "taxrates.*",
@@ -87,7 +91,7 @@ _ACCOUNTING = [
     "deliverynotes.*", "recurringinvoices.*", "reminders.*", "mpesa.*", "pos.*", "loyalty.*",
     "suppliers.*", "purchaseorders.view", "goodsreceipts.view", "bills.*", "paymentvouchers.*", "supplierpayments.*", "inventory.view",
     "manufacturing.view", "banking.*", "payroll.view", "payroll.approve",
-    "budgets.view", "budgets.manage", "projects.*", "approvals.view", "fixedassets.*",
+    "budgets.view", "budgets.manage", "projects.*", "approvals.view", "fixedassets.*", "crm.view", "inbox.*",
 ]
 
 PRESET_ROLES: list[dict] = [
@@ -110,7 +114,7 @@ PRESET_ROLES: list[dict] = [
     },
     {"slug": "store-manager", "name": "Store manager", "description": "Stock, warehouses and purchasing.", "permissions": _VIEW_BASICS + _TRADING_LOOKUPS + [
         "products.*", "customers.view", "suppliers.*", "purchaseorders.view", "purchaseorders.create", "goodsreceipts.*", "bills.view",
-        "inventory.*", "manufacturing.*", "deliverynotes.*",
+        "inventory.*", "manufacturing.*", "deliverynotes.*", "inbox.view", "inbox.send",
     ]},
     {
         "slug": "hr-manager",
@@ -156,19 +160,20 @@ APP_MODULES: dict[str, dict] = {
     "banking": {"label": "Cash and banking", "description": "Bank, M-Pesa and cash accounts, expenses and reconciliation."},
     "people": {"label": "Leave and payroll", "description": "Leave, payroll with PAYE, SHIF, NSSF and Housing Levy, payslips, work reports."},
     "projects": {"label": "Projects", "description": "Job costing: income, costs and profit per job or contract."},
+    "crm": {"label": "CRM", "description": "Leads, a pipeline of deals, and follow-up calls, meetings and tasks."},
     "control": {"label": "Budgets, approvals and assets", "description": "Budgets, cost centres, approval chains and fixed assets."},
 }
 
 # What a new business wants to do first; each switches on the modules it needs (changeable any time in Settings).
 GOALS: dict[str, dict] = {
     "invoicing": {"label": "Send invoices and get paid", "description": "For service businesses, consultants and freelancers.",
-                  "modules": ["sales", "banking"]},
+                  "modules": ["sales", "banking", "crm"]},
     "shop": {"label": "Run a shop with a till", "description": "Retail shops, chemists, hardware stores, restaurants and bars.",
              "modules": ["sales", "pos", "inventory", "purchasing", "banking"]},
     "stock": {"label": "Manage stock and warehouses", "description": "Distributors and stores that mainly track goods.",
               "modules": ["inventory", "purchasing"]},
     "projects": {"label": "Run jobs and projects", "description": "Contractors, agencies, law and consulting firms.",
-                 "modules": ["sales", "purchasing", "banking", "projects"]},
+                 "modules": ["sales", "purchasing", "banking", "projects", "crm"]},
     "manufacturing": {"label": "Make products", "description": "Bakeries, factories, workshops.",
                       "modules": ["sales", "purchasing", "inventory", "manufacturing", "banking"]},
     "payroll": {"label": "Run payroll", "description": "Pay staff with PAYE, SHIF, NSSF and the Housing Levy done for you.",

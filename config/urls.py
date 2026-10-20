@@ -73,6 +73,10 @@ workspace_patterns = [
     path("report-submissions/", include("apps.reportsubmissions.urls")),
     path("report-requests/", include("apps.reportsubmissions.urls_requests")),
     path("payment-options/", include("apps.paymentoptions.urls")),
+    path("leads/", include("apps.leads.urls")),
+    path("deals/", include("apps.deals.urls")),
+    path("activities/", include("apps.activities.urls")),
+    path("inbox/", include("apps.inboxmessages.urls")),
     path("document-emails/", include("apps.documentemails.urls")),
     path("related-documents/", include("apps.relateddocs.urls")),
     path("delivery-notes/", include("apps.deliverynotes.urls")),
@@ -96,6 +100,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/workspaces/", include("apps.workspaces.urls")),
+    path("api/v1/groups/", include("apps.companygroups.urls")),
     path("api/v1/invitations/", include("apps.invitations.urls_public")),
     path("api/v1/hooks/pay/", include("apps.mpesatransactions.urls_hooks")),  # Safaricom callbacks
     path("api/v1/portal/", include("apps.portallinks.urls_public")),  # customers, no sign-in

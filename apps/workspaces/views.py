@@ -73,6 +73,7 @@ class WorkspaceContextView(generics.GenericAPIView):
         from apps.departments.models import Department
         from apps.fiscalyears.models import FiscalYear
         from apps.fiscalyears.services import ended_unclosed
+        from apps.inboxmessages.models import InboxMessage
 
         membership = request.membership
         employee = getattr(membership, "employee", None)
@@ -97,6 +98,8 @@ class WorkspaceContextView(generics.GenericAPIView):
             ],
             "unclosed_years": [y.name for y in ended_unclosed(request.workspace)],
             "module_catalog": [{"key": k, **v} for k, v in APP_MODULES.items()],
+            "inbox_new": InboxMessage.objects.filter(workspace=request.workspace, status="new").count()
+            if request.membership.has_perm("inbox.view") else 0,
             "goal_catalog": [{"key": k, **v} for k, v in GOALS.items()],
         }
         return Response(self.get_serializer(data).data)
