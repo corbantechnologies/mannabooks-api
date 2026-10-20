@@ -73,6 +73,8 @@ workspace_patterns = [
     path("report-submissions/", include("apps.reportsubmissions.urls")),
     path("report-requests/", include("apps.reportsubmissions.urls_requests")),
     path("payment-options/", include("apps.paymentoptions.urls")),
+    path("document-emails/", include("apps.documentemails.urls")),
+    path("related-documents/", include("apps.relateddocs.urls")),
     path("delivery-notes/", include("apps.deliverynotes.urls")),
     path("recurring-invoices/", include("apps.recurringinvoices.urls")),
     path("reminders/", include("apps.reminders.urls")),

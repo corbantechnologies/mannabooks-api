@@ -115,6 +115,8 @@ INSTALLED_APPS = [
     "apps.reportrequests",
     "apps.reportsubmissions",
     "apps.paymentoptions",
+    "apps.documentemails",
+    "apps.relateddocs",
     "apps.deliverynotes",
     "apps.recurringinvoices",
     "apps.reminders",
