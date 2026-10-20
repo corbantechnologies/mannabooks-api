@@ -41,7 +41,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     google_sub = models.CharField(max_length=64, unique=True, null=True, blank=True, help_text="Google account id")
     email_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False, help_text="Can sign in to the Django admin.")
+    is_staff = models.BooleanField(default=False, help_text="MannaBooks staff: can use the platform admin (/admin).")
+    full_access = models.BooleanField(default=False, help_text="Given by MannaBooks: every business this person owns is on the top plan, free")
+    full_access_note = models.CharField(max_length=255, blank=True, help_text="Why, e.g. partner accountant")
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()

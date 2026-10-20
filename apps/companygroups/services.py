@@ -56,6 +56,10 @@ def add_company(group, workspace, user):
         raise BusinessRuleError(f"You need to manage {workspace.name}'s settings to add it to a group.")
     if workspace.group_id and workspace.group_id != group.pk:
         raise BusinessRuleError(f"{workspace.name} is already in the group {workspace.group}. Remove it there first.")
+    from apps.subscriptions.services import has_feature
+
+    if not has_feature(workspace, "company_groups"):
+        raise BusinessRuleError(f"{workspace.name}'s plan doesn't include company groups. Upgrade it in Settings > Plan and billing.")
     if workspace.currency != group.currency:
         raise BusinessRuleError(f"{workspace.name} keeps its books in {workspace.currency}; this group reports in {group.currency}.")
     workspace.group = group

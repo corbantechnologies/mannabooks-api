@@ -28,6 +28,8 @@ class Workspace(BaseModel):
     modules = models.JSONField(default=list, blank=True, help_text="Switched-on modules (keys of APP_MODULES); empty means all")
     business_goal = models.CharField(max_length=20, blank=True, help_text="What the business chose to do first")
     is_active = models.BooleanField(default=True)
+    blocked_at = models.DateTimeField(null=True, blank=True, help_text="Blocked by MannaBooks staff; nobody can use it until unblocked")
+    blocked_reason = models.CharField(max_length=255, blank=True)
     # online shop
     store_enabled = models.BooleanField(default=False, help_text="Show the online shop at /shop/<slug>")
     store_intro = models.TextField(blank=True, help_text="A few words at the top of the shop")

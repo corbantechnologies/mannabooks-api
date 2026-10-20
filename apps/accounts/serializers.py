@@ -10,8 +10,8 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "full_name", "phone", "avatar_url", "email_verified", "has_password", "date_joined"]
-        read_only_fields = ["id", "email", "email_verified", "has_password", "date_joined"]
+        fields = ["id", "email", "full_name", "phone", "avatar_url", "email_verified", "has_password", "is_staff", "date_joined"]
+        read_only_fields = ["id", "email", "email_verified", "has_password", "is_staff", "date_joined"]
 
     def get_has_password(self, obj) -> bool:
         return obj.has_usable_password()

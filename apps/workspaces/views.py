@@ -67,6 +67,7 @@ class WorkspaceContextView(generics.GenericAPIView):
 
     permission_classes = [IsAuthenticated, WorkspacePermission]
     serializer_class = WorkspaceContextSerializer
+    subscription_exempt = True  # a blocked or unpaid business still needs to know it is
 
     def get(self, request, workspace):
         from apps.core.catalog import APP_MODULES, GOALS
@@ -75,6 +76,7 @@ class WorkspaceContextView(generics.GenericAPIView):
         from apps.fiscalyears.services import ended_unclosed
         from apps.inboxmessages.models import InboxMessage
         from apps.onlineorders.models import OnlineOrder
+        from apps.subscriptions.services import of as subscription_of
 
         membership = request.membership
         employee = getattr(membership, "employee", None)
@@ -104,5 +106,14 @@ class WorkspaceContextView(generics.GenericAPIView):
             "online_orders_new": OnlineOrder.objects.filter(workspace=request.workspace, status="new").count()
             if request.membership.has_perm("onlineorders.view") else 0,
             "goal_catalog": [{"key": k, **v} for k, v in GOALS.items()],
+            "pdf_enabled": bool(settings.PDF_SERVICE_URL and settings.PDF_SERVICE_KEY),
+            "blocked": bool(request.workspace.blocked_at),
+            "blocked_reason": request.workspace.blocked_reason,
+        }
+        sub = subscription_of(request.workspace)
+        data["subscription"] = {
+            "plan_key": sub.plan.key, "plan_name": sub.plan.name, "status": sub.status, "is_free": sub.plan.is_free,
+            "trial_ends_on": sub.trial_ends_on, "paid_until": sub.paid_until, "account_number": sub.account_number,
+            "complimentary": sub.complimentary, "can_write": sub.can_write, "modules": sub.plan.modules, "features": sub.plan.features,
         }
         return Response(self.get_serializer(data).data)

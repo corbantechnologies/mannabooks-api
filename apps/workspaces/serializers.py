@@ -86,6 +86,20 @@ class MyWorkspaceSerializer(WorkspaceSerializer):
         return membership.role.name if membership else None
 
 
+class ContextSubscriptionSerializer(serializers.Serializer):
+    plan_key = serializers.CharField()
+    plan_name = serializers.CharField()
+    status = serializers.CharField()
+    is_free = serializers.BooleanField()
+    trial_ends_on = serializers.DateField(allow_null=True)
+    paid_until = serializers.DateField(allow_null=True)
+    account_number = serializers.CharField(help_text="The business's account number for paying MannaBooks by paybill")
+    complimentary = serializers.BooleanField()
+    can_write = serializers.BooleanField(help_text="False: read-only until paid")
+    modules = serializers.ListField(child=serializers.CharField(), help_text="App modules the plan includes")
+    features = serializers.ListField(child=serializers.CharField())
+
+
 class WorkspaceContextSerializer(serializers.Serializer):
     """Everything the web app needs about the caller inside one workspace."""
 
@@ -105,3 +119,7 @@ class WorkspaceContextSerializer(serializers.Serializer):
     online_orders_new = serializers.IntegerField(help_text="Online shop orders not yet looked at")
     module_catalog = serializers.ListField(child=serializers.DictField(), help_text="Modules that can be switched on: key, label, description")
     goal_catalog = serializers.ListField(child=serializers.DictField(), help_text="Starting goals: key, label, description, modules")
+    pdf_enabled = serializers.BooleanField(help_text="Documents can be downloaded as PDF (the PDF service is set up)")
+    blocked = serializers.BooleanField(help_text="Blocked by MannaBooks staff")
+    blocked_reason = serializers.CharField(allow_blank=True)
+    subscription = ContextSubscriptionSerializer()

@@ -29,6 +29,9 @@ def save(workspace, *, header: dict, rows: list[dict] | None, user=None, quotati
         raise BusinessRuleError("Choose a customer.")
     check_customer(customer)
     if quotation is None:
+        from apps.subscriptions.services import check_documents
+
+        check_documents(workspace)
         issue_date = header.get("issue_date") or timezone.localdate()
         quotation = Quotation(
             workspace=workspace, created_by=user, customer=customer, issue_date=issue_date,

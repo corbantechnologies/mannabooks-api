@@ -37,6 +37,9 @@ def create_workspace(user, **data) -> Workspace:
     from apps.units.services import seed_units
 
     seed_units(workspace, user)
+    from apps.subscriptions.services import start
+
+    start(workspace)  # a trial of the top plan
     return workspace
 
 

@@ -126,6 +126,9 @@ def handle_stk_callback(conn: MpesaConnection, body: dict) -> None:
     tx.paid_at = _parse_time(items.get("TransactionDate"))
     tx.save()
     _try_match(tx)
+    from apps.subscriptions.services import mpesa_settled
+
+    mpesa_settled(tx)
 
 
 @transaction.atomic
@@ -141,6 +144,9 @@ def handle_c2b(conn: MpesaConnection, body: dict) -> MpesaTransaction | None:
         raw={"confirmation": body},
     )
     _try_match(tx)
+    from apps.subscriptions.services import mpesa_settled
+
+    mpesa_settled(tx)
     return tx
 
 

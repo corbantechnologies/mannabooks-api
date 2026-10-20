@@ -24,6 +24,9 @@ def invite(request, email: str, role, employee=None) -> Invitation:
         pending.save(update_fields=["role", "employee", "expires_at", "updated_at"])
         invitation = pending
     else:
+        from apps.subscriptions.services import check_seat
+
+        check_seat(workspace, role.slug)
         invitation = Invitation.objects.create(
             workspace=workspace, email=email, role=role, employee=employee, created_by=request.user
         )

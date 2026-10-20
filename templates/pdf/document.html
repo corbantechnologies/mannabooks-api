@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ title }} {{ number }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; color: #1c1917; margin: 0; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .logo { max-height: 56px; max-width: 180px; margin-bottom: 6px; }
+  .biz { font-size: 15pt; font-weight: 700; margin: 0; }
+  .muted { color: #57534e; }
+  .small { font-size: 9pt; }
+  h1 { font-size: 20pt; margin: 0; text-align: right; letter-spacing: .5px; }
+  .meta { text-align: right; margin-top: 6px; }
+  .meta td { padding: 1px 0 1px 12px; }
+  .party { margin: 22px 0 14px; display: flex; justify-content: space-between; gap: 24px; }
+  .label { font-size: 8pt; text-transform: uppercase; letter-spacing: .6px; color: #78716c; margin-bottom: 3px; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.lines th { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px; color: #57534e; text-align: left; border-bottom: 1.5px solid #1c1917; padding: 6px 6px; }
+  table.lines td { padding: 6px; border-bottom: 1px solid #e7e5e4; vertical-align: top; }
+  .r { text-align: right; white-space: nowrap; }
+  .totals { margin-left: auto; margin-top: 10px; border-collapse: collapse; min-width: 42%; }
+  .totals td { padding: 4px 6px; }
+  .totals .grand td { border-top: 1.5px solid #1c1917; font-weight: 700; font-size: 12pt; }
+  .box { border: 1px solid #e7e5e4; border-radius: 6px; padding: 10px 12px; margin-top: 16px; page-break-inside: avoid; }
+  .etims { display: flex; gap: 14px; align-items: center; }
+  .etims img { width: 92px; height: 92px; }
+  .foot { margin-top: 26px; font-size: 8.5pt; color: #78716c; border-top: 1px solid #e7e5e4; padding-top: 8px; display: flex; justify-content: space-between; }
+  .stamp { display: inline-block; border: 2px solid #b91c1c; color: #b91c1c; padding: 2px 10px; font-weight: 700; transform: rotate(-4deg); margin-top: 6px; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
+      <p class="biz">{{ business.name }}</p>
+      {% if business.address %}<div class="muted small">{{ business.address|linebreaksbr }}</div>{% endif %}
+      <div class="muted small">{% if business.phone %}{{ business.phone }}{% endif %}{% if business.phone and business.email %} · {% endif %}{% if business.email %}{{ business.email }}{% endif %}</div>
+      {% if business.kra_pin %}<div class="small">KRA PIN {{ business.kra_pin }}{% if business.vat_number %} · VAT {{ business.vat_number }}{% endif %}</div>{% endif %}
+    </div>
+    <div>
+      <h1>{{ title }}</h1>
+      <table class="meta">
+        <tr><td class="muted">Number</td><td><strong>{{ number }}</strong></td></tr>
+        <tr><td class="muted">Date</td><td>{{ date|date:"d M Y" }}</td></tr>
+        {% if second_date %}<tr><td class="muted">{{ second_label }}</td><td>{{ second_date|date:"d M Y" }}</td></tr>{% endif %}
+        {% if reference %}<tr><td class="muted">Reference</td><td>{{ reference }}</td></tr>{% endif %}
+      </table>
+      {% if void %}<div class="stamp">VOID</div>{% endif %}
+    </div>
+  </div>
+
+  {% if party %}
+  <div class="party">
+    <div>
+      <div class="label">{{ party_label }}</div>
+      <strong>{{ party.name }}</strong>
+      {% if party.address %}<div class="small">{{ party.address|linebreaksbr }}</div>{% endif %}
+      {% if party.kra_pin %}<div class="small">KRA PIN {{ party.kra_pin }}</div>{% endif %}
+      <div class="small muted">{% if party.phone %}{{ party.phone }}{% endif %}{% if party.phone and party.email %} · {% endif %}{% if party.email %}{{ party.email }}{% endif %}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <table class="lines">
+    <thead><tr><th>Description</th><th class="r">Qty</th>{% if priced %}<th class="r">Price</th><th class="r">VAT</th>{% endif %}<th class="r">{% if money %}Amount{% endif %}</th></tr></thead>
+    <tbody>
+      {% for line in lines %}
+      <tr>
+        <td>{{ line.description }}</td>
+        <td class="r">{{ line.quantity }}</td>
+        {% if priced %}<td class="r">{{ line.price }}</td><td class="r">{{ line.tax }}</td>{% endif %}
+        <td class="r">{{ line.amount }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if money %}
+  <table class="totals">
+    {% if subtotal %}<tr><td class="muted">Subtotal</td><td class="r">{{ subtotal }}</td></tr>{% endif %}
+    {% if tax_total %}<tr><td class="muted">VAT</td><td class="r">{{ tax_total }}</td></tr>{% endif %}
+    <tr class="grand"><td>Total {{ currency }}</td><td class="r">{{ total }}</td></tr>
+    {% if amount_paid %}<tr><td class="muted">Paid</td><td class="r">{{ amount_paid }}</td></tr>{% endif %}
+    {% if balance_due %}<tr><td><strong>Balance due</strong></td><td class="r"><strong>{{ balance_due }}</strong></td></tr>{% endif %}
+  </table>
+  {% endif %}
+
+  {% if pay %}
+  <div class="box">
+    <div class="label">How to pay</div>
+    {% for option in pay %}<div class="small">{{ option|join:" · " }}</div>{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if etims_number %}
+  <div class="box etims">
+    {% if etims_qr %}<img src="{{ etims_qr }}" alt="KRA QR code">{% endif %}
+    <div class="small">
+      <div class="label">KRA eTIMS</div>
+      <div>Control unit invoice number: <strong>{{ etims_number }}</strong></div>
+      {% if etims_signature %}<div class="muted">Signature: {{ etims_signature }}</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if notes %}<div class="box small"><div class="label">Notes</div>{{ notes|linebreaksbr }}</div>{% endif %}
+
+  <div class="foot"><span>{{ business.name }}</span><span>Made with MannaBooks · mannabooks.co.ke</span></div>
+</body>
+</html>

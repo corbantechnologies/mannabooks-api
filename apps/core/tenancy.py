@@ -44,6 +44,14 @@ class WorkspacePermission(BasePermission):
         code = view.required_permission(request) if hasattr(view, "required_permission") else None
         if code and not membership.has_perm(code):
             raise PermissionDenied(f"Your role ({membership.role.name}) does not allow this ({code}).")
+        if not getattr(view, "subscription_exempt", False):  # billing, support and the context stay usable
+            if workspace.blocked_at:
+                raise PermissionDenied(f"MannaBooks has blocked {workspace.name}: {workspace.blocked_reason or 'contact MannaBooks'}. "
+                                       "Use Help and feedback to reach us.")
+            if request.method not in SAFE_METHODS:
+                from apps.subscriptions.services import check_write
+
+                check_write(workspace, code)
         return True
 
 

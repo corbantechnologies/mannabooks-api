@@ -122,6 +122,13 @@ INSTALLED_APPS = [
     "apps.companygroups",
     "apps.intercompanytransactions",
     "apps.onlineorders",
+    "apps.plans",
+    "apps.coupons",
+    "apps.subscriptions",
+    "apps.subscriptionpayments",
+    "apps.supporttickets",
+    "apps.platform",
+    "apps.importjobs",
     "apps.documentemails",
     "apps.relateddocs",
     "apps.deliverynotes",
@@ -314,6 +321,17 @@ ETIMS_ENABLED = env_bool("ETIMS_ENABLED", False)
 
 # Safaricom Daraja: each workspace uses its own app credentials. Callbacks reach the API at PUBLIC_API_URL.
 PUBLIC_API_URL = os.environ.get("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
+
+# --- PDFs: the pdf-service (Playwright) Railway service. Blank: browser printing only, emails without a PDF ---
+PDF_SERVICE_URL = os.environ.get("PDF_SERVICE_URL", "")
+PDF_SERVICE_KEY = os.environ.get("PDF_SERVICE_KEY", "")
+
+# --- MannaBooks subscriptions ---
+# Businesses pay MannaBooks through the M-Pesa connection of MannaBooks' own workspace (its paybill), with their
+# subscription account number (e.g. MB104233) as the account. Blank: only payments recorded by staff.
+PLATFORM_WORKSPACE_SLUG = os.environ.get("PLATFORM_WORKSPACE_SLUG", "")
+TRIAL_DAYS = int(os.environ.get("TRIAL_DAYS", "30"))
+GRACE_DAYS = int(os.environ.get("GRACE_DAYS", "14"))
 MPESA_SANDBOX_URL = os.environ.get("MPESA_SANDBOX_URL", "https://sandbox.safaricom.co.ke")
 MPESA_PRODUCTION_URL = os.environ.get("MPESA_PRODUCTION_URL", "https://api.safaricom.co.ke")
 ETIMS_SANDBOX_URL = os.environ.get("ETIMS_SANDBOX_URL", "https://etims-api-sbx.kra.go.ke/etims-api")
@@ -334,6 +352,7 @@ CELERY_BEAT_SCHEDULE = {
     "loyalty-expiry": {"task": "apps.loyaltytransactions.tasks.expire_loyalty_points", "schedule": crontab(hour=1, minute=0)},
     "work-reports": {"task": "apps.reportsubmissions.tasks.run_work_reports", "schedule": crontab(hour=7, minute=0)},
     "financial-years": {"task": "apps.fiscalyears.tasks.roll_forward_financial_years", "schedule": crontab(hour=0, minute=30)},
+    "subscriptions": {"task": "apps.subscriptions.tasks.update_subscriptions", "schedule": crontab(hour=0, minute=45)},
 }
 
 # --- Email ---

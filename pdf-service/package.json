@@ -1,0 +1,9 @@
+{
+  "name": "mannabooks-pdf-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Renders MannaBooks documents to PDF with Playwright (Chromium).",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "playwright": "1.47.2" }
+}

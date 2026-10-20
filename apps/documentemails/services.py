@@ -1,5 +1,6 @@
 """Compose and send a document by email. The email carries a summary, the lines, how to pay and, for invoices,
-the private link to view and pay online. (PDF attachments come with the PDF service.)"""
+the private link to view and pay online, and the PDF when the PDF service is set up."""
+import logging
 from email.utils import formataddr, parseaddr
 from html import escape
 
@@ -11,6 +12,8 @@ from apps.core.exceptions import BusinessRuleError
 
 from .models import DocumentEmail
 from .registry import DOCS
+
+logger = logging.getLogger("mannabooks.email")
 
 
 def _money(value) -> str:
@@ -154,4 +157,11 @@ def deliver(email: DocumentEmail) -> None:
                                  [x.strip() for x in email.to.split(",") if x.strip()], cc=[x.strip() for x in email.cc.split(",") if x.strip()],
                                  reply_to=reply_to)
     msg.attach_alternative(html, "text/html")
+    from . import pdfs
+
+    if pdfs.enabled():  # attach the PDF; if the PDF service is down, the email still goes
+        try:
+            msg.attach(pdfs.filename(email.document_type, document), pdfs.render(workspace, email.document_type, document), "application/pdf")
+        except Exception:  # noqa: BLE001
+            logger.warning("PDF not attached to %s", email.pk, exc_info=True)
     msg.send()

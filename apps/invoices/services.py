@@ -37,6 +37,9 @@ def save_draft(workspace, *, header: dict, rows: list[dict] | None, user=None, i
         raise BusinessRuleError("Only a debit note refers to an original invoice.")
     issue_date = header.get("issue_date") or (invoice.issue_date if invoice else timezone.localdate())
     if invoice is None:
+        from apps.subscriptions.services import check_documents
+
+        check_documents(workspace)
         invoice = Invoice(workspace=workspace, created_by=user, customer=customer, issue_date=issue_date,
                           currency=header.get("currency") or default_currency(workspace, customer),
                           due_date=header.get("due_date") or issue_date + timedelta(days=customer.payment_terms_days))

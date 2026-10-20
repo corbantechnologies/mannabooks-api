@@ -65,3 +65,37 @@ def test_email_a_payment_receipt(api, ws, day, mailoutbox, django_capture_on_com
     body = mailoutbox[0].body
     assert f"Invoice {inv['number'] if inv.get('number') else ''}" in body or "Invoice INV-" in body
     assert "Kept as credit on your account" in body and "Total KES 1,500.00" in body
+
+
+def test_pdf_download_and_attachment(api, ws, day, settings, monkeypatch, mailoutbox, django_capture_on_commit_callbacks):
+    import requests
+
+    from apps.documentemails.pdfs import html_for
+    from apps.invoices.models import Invoice
+
+    cust = customer(api, ws, email="accounts@baraka.co.ke")
+    inv = draft_invoice(api, ws, cust, day).data
+    api.post(url(ws, f"invoices/{inv['id']}/issue/"))
+    doc = {"document_type": "invoice", "object_id": inv["id"]}
+    assert api.get(url(ws, "document-emails/pdf/"), doc).status_code == 409  # no PDF service set up: use Print
+
+    html = html_for(ws, "invoice", Invoice.objects.get(pk=inv["id"]))
+    assert "Tax invoice" in html and "P051234567X" in html and "Baraka Supplies Ltd" in html and "Balance due" in html
+
+    sent_html = {}
+
+    class Fake:
+        status_code, content = 200, b"%PDF-1.7 fake"
+
+    def fake_post(url_, json=None, headers=None, timeout=None):
+        sent_html["html"], sent_html["key"] = json["html"], headers["X-Render-Key"]
+        return Fake()
+
+    settings.PDF_SERVICE_URL, settings.PDF_SERVICE_KEY = "http://pdf.internal", "secret"
+    monkeypatch.setattr(requests, "post", fake_post)
+    pdf = api.get(url(ws, "document-emails/pdf/"), doc)
+    assert pdf.status_code == 200 and pdf["Content-Type"] == "application/pdf" and pdf.content.startswith(b"%PDF")
+    assert sent_html["key"] == "secret" and "<html" in sent_html["html"]
+    with django_capture_on_commit_callbacks(execute=True):
+        api.post(url(ws, "document-emails/"), {**doc, "to": "accounts@baraka.co.ke", "subject": "Your invoice"}, format="json")
+    assert mailoutbox[-1].attachments[0][0].endswith(".pdf") and mailoutbox[-1].attachments[0][2] == "application/pdf"

@@ -182,3 +182,18 @@ GOALS: dict[str, dict] = {
                 "modules": ["people", "banking"]},
     "everything": {"label": "Everything", "description": "The full system: every module switched on.", "modules": list(APP_MODULES)},
 }
+
+
+# Which app module (above) each permission module belongs to, so a plan without that module can't change its records.
+# Permission modules not listed (accounting, customers, products, settings...) are in every plan.
+PERMISSION_APP_MODULE: dict[str, str] = {
+    "pos": "pos", "loyalty": "pos", "onlineorders": "store",
+    "quotations": "sales", "invoices": "sales", "payments": "sales", "receipts": "sales", "creditnotes": "sales", "deliverynotes": "sales",
+    "recurringinvoices": "sales", "reminders": "sales",
+    "purchaseorders": "purchasing", "goodsreceipts": "purchasing", "bills": "purchasing", "paymentvouchers": "purchasing",
+    "supplierpayments": "purchasing",
+    "inventory": "inventory", "manufacturing": "manufacturing", "banking": "banking",
+    "leave": "people", "payroll": "people", "workreports": "people",
+    "projects": "projects", "crm": "crm",
+    "budgets": "control", "approvals": "control", "fixedassets": "control",
+}

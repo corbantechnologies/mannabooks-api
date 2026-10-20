@@ -75,3 +75,22 @@ class DocumentEmailDraftView(WorkspaceScopedMixin, generics.GenericAPIView):
         q = request.query_params
         document = _document(request, q.get("document_type"), q.get("object_id"), "send_perm")
         return Response(DraftSerializer(services.defaults(request.workspace, q.get("document_type"), document)).data)
+
+
+class DocumentPdfView(WorkspaceScopedMixin, generics.GenericAPIView):
+    """The document as a PDF (needs the PDF service; otherwise use the browser's Print > Save as PDF)."""
+
+    permission_map = {"GET": None}
+    queryset = DocumentEmail.objects.all()
+
+    @extend_schema(parameters=DOC_PARAMS, responses={(200, "application/pdf"): OpenApiTypes.BINARY})
+    def get(self, request, workspace):
+        from django.http import HttpResponse
+
+        from . import pdfs
+
+        q = request.query_params
+        document = _document(request, q.get("document_type"), q.get("object_id"))
+        res = HttpResponse(pdfs.render(request.workspace, q.get("document_type"), document), content_type="application/pdf")
+        res["Content-Disposition"] = f'inline; filename="{pdfs.filename(q.get("document_type"), document)}"'
+        return res

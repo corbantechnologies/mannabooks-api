@@ -18,6 +18,9 @@ def create(workspace, *, header: dict, rows: list[dict], method: str, deposit_ac
            customer_name="", customer_pin="", shift=None, mpesa_prompt=False, redeem_points=0, user=None) -> Receipt:
     customer = header.get("customer")
     check_customer(customer)
+    from apps.subscriptions.services import check_documents
+
+    check_documents(workspace)
     if shift is not None:
         if shift.status != "open":
             raise BusinessRuleError("This shift is closed. Open a new shift to sell.")

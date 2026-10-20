@@ -3,6 +3,8 @@ from django.http import JsonResponse
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
+from apps.plans.views import PublicPlanListView
+
 
 def health(_request):
     return JsonResponse({"status": "ok"})
@@ -78,6 +80,9 @@ workspace_patterns = [
     path("activities/", include("apps.activities.urls")),
     path("inbox/", include("apps.inboxmessages.urls")),
     path("online-orders/", include("apps.onlineorders.urls")),
+    path("billing/", include("apps.subscriptions.urls")),
+    path("support/", include("apps.supporttickets.urls")),
+    path("", include("apps.importjobs.urls")),  # imports/ and exports/
     path("document-emails/", include("apps.documentemails.urls")),
     path("related-documents/", include("apps.relateddocs.urls")),
     path("delivery-notes/", include("apps.deliverynotes.urls")),
@@ -102,6 +107,8 @@ urlpatterns = [
     path("api/v1/auth/", include("apps.accounts.urls")),
     path("api/v1/workspaces/", include("apps.workspaces.urls")),
     path("api/v1/groups/", include("apps.companygroups.urls")),
+    path("api/v1/platform/", include("apps.platform.urls")),  # MannaBooks staff
+    path("api/v1/plans/", PublicPlanListView.as_view(), name="public-plans"),
     path("api/v1/invitations/", include("apps.invitations.urls_public")),
     path("api/v1/hooks/pay/", include("apps.mpesatransactions.urls_hooks")),  # Safaricom callbacks
     path("api/v1/portal/", include("apps.portallinks.urls_public")),  # customers, no sign-in
