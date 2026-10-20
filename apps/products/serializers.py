@@ -43,7 +43,7 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
         model = Product
         fields = [
             "id", "code", "name", "kind", "category_id", "category_name", "description", "unit", "sale_price", "cost_price", "tax_rate_id",
-            "tax_rate_name", "income_account_id", "track_inventory", "made_to_order", "reorder_level", "stock_on_hand", "units", "is_active", "created_at",
+            "tax_rate_name", "income_account_id", "track_inventory", "made_to_order", "online", "image_url", "reorder_level", "stock_on_hand", "units", "is_active", "created_at",
             "opening_quantity", "opening_unit_cost", "opening_warehouse_id",
         ]
         read_only_fields = ["id", "tax_rate_name", "category_name", "stock_on_hand", "created_at"]

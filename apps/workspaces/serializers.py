@@ -14,7 +14,8 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "legal_name", "kra_pin", "vat_registered", "vat_number", "currency",
             "country", "timezone", "phone", "email", "address", "logo_url", "fiscal_year_start_month",
-            "modules", "business_goal", "group_id", "group_name", "created_at",
+            "modules", "business_goal", "store_enabled", "store_intro", "store_allow_pickup", "store_allow_delivery", "store_delivery_fee",
+            "store_pay_on_delivery", "group_id", "group_name", "created_at",
         ]
         read_only_fields = ["id", "slug", "group_id", "group_name", "created_at"]
 
@@ -101,5 +102,6 @@ class WorkspaceContextSerializer(serializers.Serializer):
     fiscal_years = serializers.ListField(child=serializers.DictField(), help_text="Every financial year, latest first: id, name, start_date, end_date, status")
     unclosed_years = serializers.ListField(child=serializers.CharField(), help_text="Years that have ended but are not closed yet")
     inbox_new = serializers.IntegerField(help_text="Documents from other businesses waiting in the inbox")
+    online_orders_new = serializers.IntegerField(help_text="Online shop orders not yet looked at")
     module_catalog = serializers.ListField(child=serializers.DictField(), help_text="Modules that can be switched on: key, label, description")
     goal_catalog = serializers.ListField(child=serializers.DictField(), help_text="Starting goals: key, label, description, modules")

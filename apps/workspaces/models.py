@@ -28,6 +28,13 @@ class Workspace(BaseModel):
     modules = models.JSONField(default=list, blank=True, help_text="Switched-on modules (keys of APP_MODULES); empty means all")
     business_goal = models.CharField(max_length=20, blank=True, help_text="What the business chose to do first")
     is_active = models.BooleanField(default=True)
+    # online shop
+    store_enabled = models.BooleanField(default=False, help_text="Show the online shop at /shop/<slug>")
+    store_intro = models.TextField(blank=True, help_text="A few words at the top of the shop")
+    store_allow_pickup = models.BooleanField(default=True)
+    store_allow_delivery = models.BooleanField(default=True)
+    store_delivery_fee = models.DecimalField(max_digits=18, decimal_places=2, default=0)
+    store_pay_on_delivery = models.BooleanField(default=True, help_text="Let customers pay when they collect or receive the order")
     group = models.ForeignKey("companygroups.CompanyGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="workspaces",
                               help_text="The company group this business is reported with")
 

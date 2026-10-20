@@ -41,6 +41,7 @@ DEFAULTS = {
     "warehouse": {"prefix": "WH-", "padding": 2, "include_year": False},
     "lead": {"prefix": "LD-", "padding": 4, "include_year": False},
     "deal": {"prefix": "DL-", "padding": 4, "include_year": False},
+    "online_order": {"prefix": "WEB-", "padding": 4, "include_year": True},
 }
 
 

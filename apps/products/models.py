@@ -24,6 +24,8 @@ class Product(WorkspaceModel):
         help_text="Blank: Sales for goods, Service income for services",
     )
     track_inventory = models.BooleanField(default=False, help_text="Keep stock levels and cost of sales for this product")
+    online = models.BooleanField(default=False, help_text="Show it in the online shop")
+    image_url = models.URLField(blank=True, help_text="A picture for the online shop")
     made_to_order = models.BooleanField(
         default=False, help_text="Made when sold (a meal, a mixed drink): selling it takes its recipe's ingredients out of stock",
     )

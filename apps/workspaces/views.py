@@ -74,6 +74,7 @@ class WorkspaceContextView(generics.GenericAPIView):
         from apps.fiscalyears.models import FiscalYear
         from apps.fiscalyears.services import ended_unclosed
         from apps.inboxmessages.models import InboxMessage
+        from apps.onlineorders.models import OnlineOrder
 
         membership = request.membership
         employee = getattr(membership, "employee", None)
@@ -100,6 +101,8 @@ class WorkspaceContextView(generics.GenericAPIView):
             "module_catalog": [{"key": k, **v} for k, v in APP_MODULES.items()],
             "inbox_new": InboxMessage.objects.filter(workspace=request.workspace, status="new").count()
             if request.membership.has_perm("inbox.view") else 0,
+            "online_orders_new": OnlineOrder.objects.filter(workspace=request.workspace, status="new").count()
+            if request.membership.has_perm("onlineorders.view") else 0,
             "goal_catalog": [{"key": k, **v} for k, v in GOALS.items()],
         }
         return Response(self.get_serializer(data).data)

@@ -60,6 +60,7 @@ MODULES: dict[str, dict] = {
     "etims": {"label": "KRA eTIMS", "actions": ["view", "manage"]},
     # Phase 7: growth
     "crm": {"label": "CRM (leads, deals and follow-ups)", "actions": ["view", "manage"]},
+    "onlineorders": {"label": "Online shop orders", "actions": ["view", "manage"]},
     "inbox": {"label": "Business inbox (documents from other MannaBooks businesses)", "actions": ["view", "send", "manage"]},
 }
 
@@ -82,7 +83,7 @@ _SELLING = [
     "customers.*", "products.view", "quotations.*", "invoices.view", "invoices.create", "invoices.issue",
     "payments.view", "payments.create", "receipts.view", "receipts.create", "creditnotes.view",
     "deliverynotes.*", "recurringinvoices.view", "reminders.view", "loyalty.view", "loyalty.enrol", "inventory.view", "projects.view",
-    "crm.*", "inbox.view", "inbox.send",
+    "crm.*", "inbox.view", "inbox.send", "onlineorders.*",
 ]
 _ACCOUNTING = [
     "ledgeraccounts.*", "journals.*", "fiscalyears.*", "periods.*", "currencies.*", "taxrates.*",
@@ -91,7 +92,7 @@ _ACCOUNTING = [
     "deliverynotes.*", "recurringinvoices.*", "reminders.*", "mpesa.*", "pos.*", "loyalty.*",
     "suppliers.*", "purchaseorders.view", "goodsreceipts.view", "bills.*", "paymentvouchers.*", "supplierpayments.*", "inventory.view",
     "manufacturing.view", "banking.*", "payroll.view", "payroll.approve",
-    "budgets.view", "budgets.manage", "projects.*", "approvals.view", "fixedassets.*", "crm.view", "inbox.*",
+    "budgets.view", "budgets.manage", "projects.*", "approvals.view", "fixedassets.*", "crm.view", "inbox.*", "onlineorders.view",
 ]
 
 PRESET_ROLES: list[dict] = [
@@ -109,7 +110,7 @@ PRESET_ROLES: list[dict] = [
         "name": "Cashier",
         "description": "Point of sale and cash receipts.",
         "permissions": _VIEW_BASICS + _TRADING_LOOKUPS + ["customers.view", "products.view", "receipts.view", "receipts.create", "payments.view",
-                                                         "payments.create", "pos.view", "pos.sell", "loyalty.view", "loyalty.enrol", "inventory.view",
+                                                         "payments.create", "pos.view", "pos.sell", "onlineorders.view", "onlineorders.manage", "loyalty.view", "loyalty.enrol", "inventory.view",
                                                          "banking.spend"],
     },
     {"slug": "store-manager", "name": "Store manager", "description": "Stock, warehouses and purchasing.", "permissions": _VIEW_BASICS + _TRADING_LOOKUPS + [
@@ -154,6 +155,7 @@ def grants(held: list[str], code: str) -> bool:
 APP_MODULES: dict[str, dict] = {
     "sales": {"label": "Sales and invoicing", "description": "Customers, quotations, invoices, payments, credit notes, delivery notes."},
     "pos": {"label": "Point of sale", "description": "The till with shifts, cash counts and loyalty points."},
+    "store": {"label": "Online shop", "description": "A public shop page where customers order and pay by M-Pesa."},
     "purchasing": {"label": "Purchasing", "description": "Suppliers, LPOs, goods received, bills and supplier payments."},
     "inventory": {"label": "Stock and warehouses", "description": "Stock levels, warehouses, transfers, adjustments and stock takes."},
     "manufacturing": {"label": "Manufacturing", "description": "Recipes and production."},
@@ -169,7 +171,7 @@ GOALS: dict[str, dict] = {
     "invoicing": {"label": "Send invoices and get paid", "description": "For service businesses, consultants and freelancers.",
                   "modules": ["sales", "banking", "crm"]},
     "shop": {"label": "Run a shop with a till", "description": "Retail shops, chemists, hardware stores, restaurants and bars.",
-             "modules": ["sales", "pos", "inventory", "purchasing", "banking"]},
+             "modules": ["sales", "pos", "store", "inventory", "purchasing", "banking"]},
     "stock": {"label": "Manage stock and warehouses", "description": "Distributors and stores that mainly track goods.",
               "modules": ["inventory", "purchasing"]},
     "projects": {"label": "Run jobs and projects", "description": "Contractors, agencies, law and consulting firms.",
