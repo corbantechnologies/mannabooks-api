@@ -19,6 +19,8 @@ python-dotenv = "*"
 google-auth = "*"
 requests = "*"
 cryptography = "*"
+django-anymail = {extras = ["resend"], version = "*"}
+django-storages = {extras = ["s3"], version = "*"}
 
 [dev-packages]
 pytest = "*"

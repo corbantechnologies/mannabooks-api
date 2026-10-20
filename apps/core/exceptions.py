@@ -24,6 +24,10 @@ class BusinessRuleError(exceptions.APIException):
     default_code = "rule"
     default_detail = "This change is not allowed."
 
+    def __init__(self, detail=None, code=None, data: dict | None = None):
+        super().__init__(detail, code)
+        self.data = data or {}
+
 
 def _flatten(detail):
     if isinstance(detail, list):
@@ -59,4 +63,6 @@ def api_exception_handler(exc, context):
         detail = getattr(exc, "detail", "")
         code = detail.code if hasattr(detail, "code") else getattr(exc, "default_code", "error")
         response.data = {"code": str(code), "message": str(detail), "errors": {}}
+        if getattr(exc, "data", None):
+            response.data["data"] = exc.data  # details the web app can act on (e.g. the date of a closed period)
     return response

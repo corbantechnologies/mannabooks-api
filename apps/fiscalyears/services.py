@@ -132,3 +132,52 @@ def reopen_year(year: FiscalYear, user=None) -> FiscalYear:
         entry_date=year.end_date, description="", lines=[], user=user,
     )
     return year
+
+
+AHEAD_DAYS = 31  # the next year exists a month before the current one ends
+FURTHEST_AHEAD = 400  # never create years for dates more than about a year away
+
+
+@transaction.atomic
+def ensure_years(workspace, until: date, user=None) -> list[FiscalYear]:
+    """Create the following financial years, in order, until one covers `until`. Returns the years made."""
+    from apps.workspaces.models import Workspace
+
+    Workspace.objects.select_for_update().filter(pk=workspace.pk).first()  # one roll-forward per workspace at a time
+    latest = FiscalYear.objects.filter(workspace=workspace).order_by("-start_date").first()
+    made = []
+    if latest is None:
+        latest = create_initial_year(workspace, user)
+        made.append(latest)
+    while latest.end_date < until:
+        latest = create_year(workspace, latest.end_date + timedelta(days=1), user)
+        made.append(latest)
+    return made
+
+
+def roll_forward_all(today: date | None = None) -> int:
+    """Nightly: every workspace has its next financial year ready before the current one ends."""
+    from apps.workspaces.models import Workspace
+
+    today = today or timezone.localdate()
+    made = 0
+    for workspace in Workspace.objects.filter(is_active=True):
+        made += len(ensure_years(workspace, today + timedelta(days=AHEAD_DAYS)))
+    return made
+
+
+def ended_unclosed(workspace, today: date | None = None) -> list[FiscalYear]:
+    """Years that have ended but are still open: the accountant should close them once the books are final."""
+    today = today or timezone.localdate()
+    return list(FiscalYear.objects.filter(workspace=workspace, status=FiscalYear.Status.OPEN, end_date__lt=today).order_by("start_date"))
+
+
+@transaction.atomic
+def restart_years(workspace, user=None) -> None:
+    """After the start month changes (allowed only before anything is posted): rebuild the years from scratch."""
+    from apps.journals.models import JournalEntry
+
+    if JournalEntry.objects.filter(workspace=workspace).exists():
+        raise BusinessRuleError("The financial year's start month can't change once transactions are posted.")
+    FiscalYear.objects.filter(workspace=workspace).delete()
+    ensure_years(workspace, timezone.localdate() + timedelta(days=AHEAD_DAYS), user)

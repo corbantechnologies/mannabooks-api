@@ -70,6 +70,8 @@ class WorkspaceContextView(generics.GenericAPIView):
 
     def get(self, request, workspace):
         from apps.departments.models import Department
+        from apps.fiscalyears.models import FiscalYear
+        from apps.fiscalyears.services import ended_unclosed
 
         membership = request.membership
         employee = getattr(membership, "employee", None)
@@ -88,5 +90,10 @@ class WorkspaceContextView(generics.GenericAPIView):
             "department": employee.department.name if employee and employee.department else None,
             "in_charge_of": sorted(set(in_charge)),
             "etims_enabled": settings.ETIMS_ENABLED,
+            "fiscal_years": [
+                {"id": str(y.id), "name": y.name, "start_date": y.start_date.isoformat(), "end_date": y.end_date.isoformat(), "status": y.status}
+                for y in FiscalYear.objects.filter(workspace=request.workspace).order_by("-start_date")
+            ],
+            "unclosed_years": [y.name for y in ended_unclosed(request.workspace)],
         }
         return Response(self.get_serializer(data).data)

@@ -110,3 +110,54 @@ class VatSummarySerializer(serializers.Serializer):
     output_vat = serializers.DecimalField(**M)
     input_vat = serializers.DecimalField(**M)
     net_vat = serializers.DecimalField(**M)
+
+
+
+class PeriodMonthSerializer(serializers.Serializer):
+    month = serializers.DateField()
+    income = serializers.DecimalField(**M)
+    expenses = serializers.DecimalField(**M)
+    profit = serializers.DecimalField(**M)
+
+
+class TopCustomerSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    amount = serializers.DecimalField(**M)
+
+
+class TopProductSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    quantity = serializers.DecimalField(max_digits=18, decimal_places=3)
+    amount = serializers.DecimalField(**M)
+
+
+class PeriodSummarySerializer(serializers.Serializer):
+    from_date = serializers.DateField()
+    to_date = serializers.DateField()
+    income = serializers.DecimalField(**M)
+    cost_of_sales = serializers.DecimalField(**M)
+    expenses = serializers.DecimalField(**M)
+    gross_profit = serializers.DecimalField(**M)
+    net_profit = serializers.DecimalField(**M)
+    cash_in = serializers.DecimalField(**M)
+    cash_out = serializers.DecimalField(**M)
+    cash_balance = serializers.DecimalField(**M)
+    invoiced = serializers.DecimalField(**M)
+    invoice_count = serializers.IntegerField()
+    cash_sales = serializers.DecimalField(**M)
+    cash_sale_count = serializers.IntegerField()
+    payments_received = serializers.DecimalField(**M)
+    bills = serializers.DecimalField(**M)
+    bill_count = serializers.IntegerField()
+    spent_on_expenses = serializers.DecimalField(**M)
+    payroll_cost = serializers.DecimalField(**M)
+    output_vat = serializers.DecimalField(**M)
+    input_vat = serializers.DecimalField(**M)
+    net_vat = serializers.DecimalField(**M)
+    receivables = serializers.DecimalField(**M)
+    receivables_overdue = serializers.DecimalField(**M)
+    payables = serializers.DecimalField(**M)
+    payables_overdue = serializers.DecimalField(**M)
+    top_customers = TopCustomerSerializer(many=True)
+    top_products = TopProductSerializer(many=True)
+    by_month = PeriodMonthSerializer(many=True)

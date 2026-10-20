@@ -56,7 +56,7 @@ def test_closed_and_missing_periods_block_posting(workspace):
     lines = [services.LineInput(account=acc(workspace, "1100"), debit=5), services.LineInput(account=acc(workspace, "3000"), credit=5)]
     with pytest.raises(BusinessRuleError, match="is closed"):
         services.post_lines(workspace, entry_date=period.start_date, description="x", source="manual", lines=lines)
-    with pytest.raises(BusinessRuleError, match="No accounting period"):
+    with pytest.raises(BusinessRuleError, match="before your first financial year"):
         services.post_lines(workspace, entry_date=date(1990, 1, 1), description="x", source="manual", lines=lines)
 
 

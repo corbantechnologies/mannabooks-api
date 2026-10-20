@@ -18,6 +18,23 @@ class WorkspaceSerializer(serializers.ModelSerializer):
     def validate_kra_pin(self, value):
         return clean_pin(value)
 
+    def validate_fiscal_year_start_month(self, value):
+        if self.instance is not None and value != self.instance.fiscal_year_start_month:
+            from apps.journals.models import JournalEntry
+
+            if JournalEntry.objects.filter(workspace=self.instance).exists():
+                raise serializers.ValidationError("This can't change once transactions are posted: the financial years are already in use.")
+        return value
+
+    def update(self, instance, validated_data):
+        month_changed = "fiscal_year_start_month" in validated_data and validated_data["fiscal_year_start_month"] != instance.fiscal_year_start_month
+        instance = super().update(instance, validated_data)
+        if month_changed:
+            from apps.fiscalyears.services import restart_years
+
+            restart_years(instance)
+        return instance
+
     def validate_currency(self, value):
         value = value.strip().upper()
         if len(value) != 3 or not value.isalpha():
@@ -59,3 +76,5 @@ class WorkspaceContextSerializer(serializers.Serializer):
     department = serializers.CharField(allow_null=True)
     in_charge_of = serializers.ListField(child=serializers.CharField())
     etims_enabled = serializers.BooleanField(help_text="KRA eTIMS signing is switched on for the platform")
+    fiscal_years = serializers.ListField(child=serializers.DictField(), help_text="Every financial year, latest first: id, name, start_date, end_date, status")
+    unclosed_years = serializers.ListField(child=serializers.CharField(), help_text="Years that have ended but are not closed yet")

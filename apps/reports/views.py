@@ -11,6 +11,7 @@ from . import services
 from .serializers import (
     AgedReportSerializer,
     BalanceSheetSerializer,
+    PeriodSummarySerializer,
     ProfitAndLossSerializer,
     TrialBalanceSerializer,
     VatSummarySerializer,
@@ -123,3 +124,16 @@ class VatSummaryView(WorkspaceScopedMixin, generics.GenericAPIView):
     def get(self, request, workspace):
         start, end = _range(request)
         return Response(VatSummarySerializer(services.vat_summary(request.workspace, from_date=start, to_date=end)).data)
+
+
+
+class PeriodSummaryView(WorkspaceScopedMixin, generics.GenericAPIView):
+    """The dashboard for a month or a financial year: profit, cash, sales, buying, VAT, payroll, balances owed, top sellers."""
+
+    permission_map = {"GET": "reports.view"}
+    serializer_class = PeriodSummarySerializer
+
+    @extend_schema(parameters=[OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE)])
+    def get(self, request, workspace):
+        start, end = _range(request)
+        return Response(PeriodSummarySerializer(services.period_summary(request.workspace, from_date=start, to_date=end)).data)

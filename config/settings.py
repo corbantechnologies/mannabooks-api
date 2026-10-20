@@ -114,6 +114,7 @@ INSTALLED_APPS = [
     "apps.depreciationentries",
     "apps.reportrequests",
     "apps.reportsubmissions",
+    "apps.paymentoptions",
     "apps.deliverynotes",
     "apps.recurringinvoices",
     "apps.reminders",
@@ -194,6 +195,29 @@ STORAGES = {
 }
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Uploaded files go to an S3-compatible bucket (the Railway Bucket) when one is configured; otherwise to MEDIA_ROOT.
+# Files stay private: the API checks who may see a file and streams it, so no public bucket URLs are used.
+def first_env(*names: str) -> str:
+    """The first of these variables that is set: our own name first, then the names Railway and other S3 hosts inject."""
+    return next((os.environ[n] for n in names if os.environ.get(n)), "")
+
+
+AWS_STORAGE_BUCKET_NAME = first_env("AWS_STORAGE_BUCKET_NAME", "AWS_S3_BUCKET_NAME", "AWS_BUCKET_NAME", "BUCKET_NAME", "BUCKET")
+if AWS_STORAGE_BUCKET_NAME:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": AWS_STORAGE_BUCKET_NAME,
+            "endpoint_url": first_env("AWS_S3_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3", "AWS_ENDPOINT_URL", "S3_ENDPOINT", "ENDPOINT") or None,
+            "region_name": first_env("AWS_S3_REGION_NAME", "AWS_DEFAULT_REGION", "AWS_REGION", "REGION") or None,
+            "access_key": first_env("AWS_ACCESS_KEY_ID", "ACCESS_KEY_ID"),
+            "secret_key": first_env("AWS_SECRET_ACCESS_KEY", "SECRET_ACCESS_KEY"),
+            "addressing_style": os.environ.get("AWS_S3_ADDRESSING_STYLE") or None,
+            "default_acl": None,
+            "querystring_auth": True,
+            "file_overwrite": False,
+        },
+    }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -290,6 +314,7 @@ CELERY_BEAT_SCHEDULE = {
     "payment-reminders": {"task": "apps.reminders.tasks.send_due_reminders", "schedule": crontab(hour=8, minute=0)},
     "loyalty-expiry": {"task": "apps.loyaltytransactions.tasks.expire_loyalty_points", "schedule": crontab(hour=1, minute=0)},
     "work-reports": {"task": "apps.reportsubmissions.tasks.run_work_reports", "schedule": crontab(hour=7, minute=0)},
+    "financial-years": {"task": "apps.fiscalyears.tasks.roll_forward_financial_years", "schedule": crontab(hour=0, minute=30)},
 }
 
 # --- Email ---
@@ -300,6 +325,12 @@ EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MannaBooks <no-reply@mannabooks.co.ke>")
+# With a Resend API key, mail goes through Resend's API (more reliable than SMTP, and it reports delivery);
+# without one, the SMTP or console settings above apply.
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+if RESEND_API_KEY:
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
 
 # --- Production hardening ---
 if not DEBUG:

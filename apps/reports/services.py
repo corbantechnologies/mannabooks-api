@@ -250,3 +250,97 @@ def vat_summary(workspace, *, from_date, to_date) -> dict:
     output_vat, input_vat = sum((r["tax"] for r in s_rows), ZERO), sum((r["tax"] for r in p_rows), ZERO)
     return {"from_date": from_date, "to_date": to_date, "sales": s_rows, "purchases": p_rows, "output_vat": output_vat, "input_vat": input_vat,
             "net_vat": output_vat - input_vat}
+
+
+
+# ---------------------------------------------------------------- period summary (the dashboard)
+def period_summary(workspace, *, from_date, to_date) -> dict:
+    """The headline numbers for a month or a year: profit, cash, sales, buying, VAT, payroll, who owes whom, and the top sellers."""
+    from collections import defaultdict
+    from datetime import timedelta
+
+    from django.db.models import F
+
+    from apps.bills.models import Bill
+    from apps.expenses.models import Expense
+    from apps.invoices.models import Invoice, InvoiceLine
+    from apps.payments.models import Payment
+    from apps.payruns.models import PayRun
+    from apps.receipts.models import Receipt, ReceiptLine
+
+    pl = profit_and_loss(workspace, from_date=from_date, to_date=to_date)
+    sec = {s["key"]: s["total"] for s in pl["sections"]}
+    rng = {"gte": from_date, "lte": to_date}
+
+    cash = JournalLine.objects.filter(entry__workspace=workspace, account__subtype__in=["cash", "bank"]).exclude(entry__status="draft")
+    period_cash = cash.filter(entry__entry_date__gte=from_date, entry__entry_date__lte=to_date).aggregate(i=Sum("debit"), o=Sum("credit"))
+    closing = cash.filter(entry__entry_date__lte=to_date).aggregate(d=Sum("debit"), c=Sum("credit"))
+
+    invoices = Invoice.objects.filter(workspace=workspace, issue_date__gte=rng["gte"], issue_date__lte=rng["lte"]).exclude(status__in=["draft", "void"])
+    receipts = Receipt.objects.filter(workspace=workspace, status="issued", issue_date__gte=rng["gte"], issue_date__lte=rng["lte"])
+    bills = Bill.objects.filter(workspace=workspace, bill_date__gte=rng["gte"], bill_date__lte=rng["lte"]).exclude(status__in=["draft", "void"])
+    expenses = Expense.objects.filter(workspace=workspace, status="posted", expense_date__gte=rng["gte"], expense_date__lte=rng["lte"])
+    payments = Payment.objects.filter(workspace=workspace, payment_date__gte=rng["gte"], payment_date__lte=rng["lte"]).exclude(status="void")
+    payroll = PayRun.objects.filter(workspace=workspace, pay_date__gte=rng["gte"], pay_date__lte=rng["lte"]).exclude(status="draft")
+
+    def total(qs, field="total", rate=False):
+        expr = F(field) * F("exchange_rate") if rate else F(field)
+        return qs.aggregate(t=Sum(expr))["t"] or ZERO
+
+    customers = defaultdict(lambda: {"name": "", "amount": ZERO})
+    for inv in invoices.select_related("customer"):
+        c = customers[inv.customer_id]
+        c["name"], c["amount"] = inv.customer.name, c["amount"] + inv.subtotal * inv.exchange_rate
+    for r in receipts.select_related("customer"):
+        key = r.customer_id or "walk-in"
+        c = customers[key]
+        c["name"] = r.customer.name if r.customer_id else "Walk-in customers"
+        c["amount"] += r.subtotal * r.exchange_rate
+
+    products = defaultdict(lambda: {"name": "", "quantity": ZERO, "amount": ZERO})
+    for model, parent in ((InvoiceLine, "invoice"), (ReceiptLine, "receipt")):
+        lines = model.objects.filter(**{f"{parent}__in": invoices if parent == "invoice" else receipts})
+        for row in lines.values("product_id", "description").annotate(q=Sum("quantity"), a=Sum(F("net_amount") * F(f"{parent}__exchange_rate"))):
+            key = row["product_id"] or row["description"]
+            p = products[key]
+            p["name"] = p["name"] or row["description"]
+            p["quantity"] += row["q"] or ZERO
+            p["amount"] += row["a"] or ZERO
+
+    # month by month inside the range (for a year: twelve bars)
+    by_month = []
+    cursor = from_date.replace(day=1)
+    while cursor <= to_date:
+        nxt = (cursor.replace(day=28) + timedelta(days=4)).replace(day=1)
+        m_pl = _pl_totals(workspace, max(cursor, from_date), min(nxt - timedelta(days=1), to_date))
+        income = expense = ZERO
+        accounts = {a.pk: a for a in LedgerAccount.objects.filter(workspace=workspace, pk__in=m_pl.keys())}
+        for pk, (debit, credit) in m_pl.items():
+            if accounts[pk].account_type == "income":
+                income += credit - debit
+            else:
+                expense += debit - credit
+        by_month.append({"month": cursor, "income": income, "expenses": expense, "profit": income - expense})
+        cursor = nxt
+
+    vat = vat_summary(workspace, from_date=from_date, to_date=to_date)
+    receivable = aged(workspace, kind="receivables", as_of=to_date)["totals"]
+    payable = aged(workspace, kind="payables", as_of=to_date)["totals"]
+    return {
+        "from_date": from_date, "to_date": to_date,
+        "income": sec["income"] + sec["other_income"], "cost_of_sales": sec["cost_of_sales"], "expenses": sec["expense"] + sec["other_expense"],
+        "gross_profit": pl["gross_profit"], "net_profit": pl["net_profit"],
+        "cash_in": period_cash["i"] or ZERO, "cash_out": period_cash["o"] or ZERO,
+        "cash_balance": (closing["d"] or ZERO) - (closing["c"] or ZERO),
+        "invoiced": total(invoices, rate=True), "invoice_count": invoices.count(),
+        "cash_sales": total(receipts, rate=True), "cash_sale_count": receipts.count(),
+        "payments_received": payments.aggregate(t=Sum("amount"))["t"] or ZERO,
+        "bills": total(bills), "bill_count": bills.count(), "spent_on_expenses": total(expenses),
+        "payroll_cost": payroll.aggregate(t=Sum("employer_cost"))["t"] or ZERO,
+        "output_vat": vat["output_vat"], "input_vat": vat["input_vat"], "net_vat": vat["net_vat"],
+        "receivables": receivable["total"], "receivables_overdue": receivable["total"] - receivable["current"],
+        "payables": payable["total"], "payables_overdue": payable["total"] - payable["current"],
+        "top_customers": sorted(customers.values(), key=lambda c: -c["amount"])[:5],
+        "top_products": sorted(products.values(), key=lambda p: -p["amount"])[:5],
+        "by_month": by_month,
+    }

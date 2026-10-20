@@ -28,6 +28,7 @@ def portal_data(link: PortalLink) -> dict:
     from apps.customers.services import balance_of
     from apps.invoices.models import Invoice
     from apps.mpesaconnections.models import MpesaConnection
+    from apps.paymentoptions.models import PaymentOption
 
     ws = link.workspace
     if link.invoice is not None:
@@ -36,7 +37,8 @@ def portal_data(link: PortalLink) -> dict:
         invoices = list(Invoice.objects.filter(customer=link.customer, status__in=["issued", "partially_paid"]).order_by("due_date"))
     return {
         "business": {"name": ws.legal_name or ws.name, "phone": ws.phone, "email": ws.email, "address": ws.address,
-                     "kra_pin": ws.kra_pin, "logo_url": ws.logo_url},
+                     "kra_pin": ws.kra_pin, "logo_url": ws.logo_url,
+                     "pay_to": [o.lines() for o in PaymentOption.objects.filter(workspace=ws, show_on_documents=True)]},
         "customer": {"name": link.customer.name, "number": link.customer.number},
         "scope": "invoice" if link.invoice_id else "statement",
         "balance": str(balance_of(link.customer)),
