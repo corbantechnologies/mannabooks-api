@@ -10,7 +10,7 @@ from .serializers import ProductCategorySerializer
 
 class CategoryMixin(WorkspaceScopedMixin):
     module = "products"
-    queryset = ProductCategory.objects.select_related("parent")
+    queryset = ProductCategory.objects.select_related("parent", "tax_rate", "income_account")
     serializer_class = ProductCategorySerializer
 
     def workspace_queryset(self):

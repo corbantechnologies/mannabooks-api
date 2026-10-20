@@ -10,7 +10,7 @@ from .serializers import ProductSerializer
 
 class ProductMixin(WorkspaceScopedMixin):
     module = "products"
-    queryset = Product.objects.select_related("tax_rate", "category")
+    queryset = Product.objects.select_related("tax_rate", "category").prefetch_related("units")
     serializer_class = ProductSerializer
 
     def workspace_queryset(self):
@@ -21,7 +21,7 @@ class ProductMixin(WorkspaceScopedMixin):
 
 
 class ProductListCreateView(ProductMixin, generics.ListCreateAPIView):
-    filterset_fields = ["is_active", "kind", "category", "track_inventory"]
+    filterset_fields = ["is_active", "kind", "category", "track_inventory", "made_to_order"]
     search_fields = ["name", "code", "description"]
     ordering_fields = ["name", "code", "sale_price"]
 

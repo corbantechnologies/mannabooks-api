@@ -62,11 +62,13 @@ def receive(workspace, *, supplier=None, purchase_order: PurchaseOrder | None = 
             if quantity > outstanding:
                 raise BusinessRuleError(f"{order_line.description}: only {outstanding.normalize():f} still to receive.")
             product, unit_cost, description = order_line.product, net_unit_cost(order_line), order_line.description
+            factor = order_line.unit_factor or 1
             order_line.received_quantity += quantity
             order_line.save(update_fields=["received_quantity", "updated_at"])
         else:
             if purchase_order is not None:
                 raise BusinessRuleError("Receive against the order's lines.")
+            factor = 1
             product, unit_cost = row.get("product"), Decimal(row.get("unit_cost") if row.get("unit_cost") is not None else 0)
             description = product.name if product else ""
             if product is not None and row.get("unit_cost") is None:
@@ -78,7 +80,9 @@ def receive(workspace, *, supplier=None, purchase_order: PurchaseOrder | None = 
                                                quantity=quantity, unit_cost=unit_cost, value=q2(quantity * unit_cost),
                                                stocked=product.track_inventory, line_no=n)
         if line.stocked:
-            move_in(product=product, warehouse=warehouse, quantity=quantity, unit_cost=unit_cost, kind="purchase", source=source, date=receipt_date)
+            # ordered in cartons: stock goes in as pieces, at the carton cost shared out
+            move_in(product=product, warehouse=warehouse, quantity=quantity * factor, unit_cost=(unit_cost / factor).quantize(Decimal("0.0001")),
+                    kind="purchase", source=source, date=receipt_date)
         total += line.value
     if n == 0:
         raise BusinessRuleError("Enter the quantity received on at least one line.")

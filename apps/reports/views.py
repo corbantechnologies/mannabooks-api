@@ -11,6 +11,7 @@ from . import services
 from .serializers import (
     AgedReportSerializer,
     BalanceSheetSerializer,
+    CategoryReportSerializer,
     PeriodSummarySerializer,
     ProfitAndLossSerializer,
     TrialBalanceSerializer,
@@ -137,3 +138,15 @@ class PeriodSummaryView(WorkspaceScopedMixin, generics.GenericAPIView):
     def get(self, request, workspace):
         start, end = _range(request)
         return Response(PeriodSummarySerializer(services.period_summary(request.workspace, from_date=start, to_date=end)).data)
+
+
+class CategoryReportView(WorkspaceScopedMixin, generics.GenericAPIView):
+    """Stock value now and sales in the period, per product category."""
+
+    permission_map = {"GET": "reports.view"}
+    serializer_class = CategoryReportSerializer
+
+    @extend_schema(parameters=[OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE)])
+    def get(self, request, workspace):
+        start, end = _range(request)
+        return Response(CategoryReportSerializer(services.by_category(request.workspace, from_date=start, to_date=end)).data)

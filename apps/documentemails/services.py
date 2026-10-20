@@ -22,15 +22,18 @@ def defaults(workspace, doc_type: str, document) -> dict:
     party = spec.party(document)
     title = spec.title(document)
     business = workspace.legal_name or workspace.name
-    total = f"{getattr(document, 'currency', '') or workspace.currency} {_money(document.total)}".strip()
-    if doc_type == "invoice":
-        note = f"Please find {title.lower()} {document.number} for {total}, due {document.due_date:%d %b %Y}."
-    elif doc_type == "quotation":
-        note = f"Thank you for your enquiry. Please find our quotation {document.number} for {total}."
-    elif doc_type == "purchase_order":
-        note = f"Please supply the items on purchase order {document.number} ({total})."
-    else:
-        note = f"Please find {title.lower()} {document.number} for {total}."
+    amount = spec.total(document)
+    total = f"{getattr(document, 'currency', '') or workspace.currency} {_money(amount)}".strip() if amount is not None else ""
+    notes = {
+        "invoice": lambda: f"Please find {title.lower()} {document.number} for {total}, due {document.due_date:%d %b %Y}.",
+        "quotation": lambda: f"Thank you for your enquiry. Please find our quotation {document.number} for {total}.",
+        "purchase_order": lambda: f"Please supply the items on purchase order {document.number} ({total}).",
+        "service_order": lambda: f"Please carry out the work on service order {document.number} ({total}).",
+        "payment": lambda: f"Thank you. We have received your payment of {total} on {document.payment_date:%d %b %Y}. This is your receipt, {document.number}.",
+        "supplier_payment": lambda: f"We have paid you {total} on {document.payment_date:%d %b %Y}. The invoices it settles are listed below.",
+        "delivery_note": lambda: f"Your goods are on the way. Delivery note {document.number} lists what we are delivering on {document.delivery_date:%d %b %Y}.",
+    }
+    note = notes.get(doc_type, lambda: f"Please find {title.lower()} {document.number} for {total}.")()
     return {
         "to": getattr(party, "email", "") or "",
         "cc": "",
@@ -69,16 +72,17 @@ def _body(workspace, doc_type: str, document, message: str, link: str) -> tuple[
 
     spec = DOCS[doc_type]
     currency = getattr(document, "currency", "") or workspace.currency
-    lines = list(document.lines.all())
+    rows_data = spec.rows(document)
+    amount = spec.total(document)
     pay = [o.lines() for o in PaymentOption.objects.filter(workspace=workspace, show_on_documents=True)] if doc_type in ("invoice", "quotation") else []
     pay = [[line.replace("the document number", document.number) for line in o] for o in pay]
     business = workspace.legal_name or workspace.name
     contact = " · ".join(x for x in [workspace.phone, workspace.email] if x)
 
     text = [message, "", f"{spec.title(document)} {document.number} ({spec.date(document):%d %b %Y})", ""]
-    text += [f"- {line.description}: {line.quantity.normalize():f} x {_money(getattr(line, 'unit_price', None) or getattr(line, 'unit_cost', 0))}"
-             f" = {_money(line.total_amount)}" for line in lines]
-    text += ["", f"Total {currency} {_money(document.total)}"]
+    text += [f"- {desc}" + (f" ({qty})" if qty else "") + (f": {_money(amt)}" if amt is not None else "") for desc, qty, amt in rows_data]
+    if amount is not None:
+        text += ["", f"Total {currency} {_money(amount)}"]
     if doc_type == "invoice":
         text.append(f"Balance due {currency} {_money(document.balance_due)} by {document.due_date:%d %b %Y}")
     if link:
@@ -87,10 +91,10 @@ def _body(workspace, doc_type: str, document, message: str, link: str) -> tuple[
         text += ["", "How to pay:"] + ["  " + " | ".join(o) for o in pay]
     text += ["", f"{business}" + (f" · {contact}" if contact else ""), "Sent with MannaBooks"]
 
+    cell = "padding:6px 8px;border-bottom:1px solid #e7e5e4"
     rows = "".join(
-        f"<tr><td style='padding:6px 8px;border-bottom:1px solid #e7e5e4'>{escape(line.description)}</td>"
-        f"<td style='padding:6px 8px;border-bottom:1px solid #e7e5e4;text-align:right'>{line.quantity.normalize():f}</td>"
-        f"<td style='padding:6px 8px;border-bottom:1px solid #e7e5e4;text-align:right'>{_money(line.total_amount)}</td></tr>" for line in lines)
+        f"<tr><td style='{cell}'>{escape(desc)}</td><td style='{cell};text-align:right'>{escape(qty)}</td>"
+        f"<td style='{cell};text-align:right'>{_money(amt) if amt is not None else ''}</td></tr>" for desc, qty, amt in rows_data)
     html = (
         "<div style='font-family:Arial,sans-serif;font-size:14px;color:#1c1917;max-width:600px'>"
         + "".join(f"<p style='margin:0 0 10px'>{escape(p)}</p>" for p in message.split("\n") if p.strip())
@@ -99,7 +103,7 @@ def _body(workspace, doc_type: str, document, message: str, link: str) -> tuple[
         + "<table style='border-collapse:collapse;width:100%'><tr style='color:#78716c;font-size:12px;text-align:left'><th style='padding:6px 8px'>Item</th>"
         + "<th style='padding:6px 8px;text-align:right'>Qty</th><th style='padding:6px 8px;text-align:right'>Amount</th></tr>"
         + rows + "</table>"
-        + f"<p style='font-weight:bold;text-align:right;margin:10px 8px'>Total {escape(currency)} {_money(document.total)}</p>"
+        + (f"<p style='font-weight:bold;text-align:right;margin:10px 8px'>Total {escape(currency)} {_money(amount)}</p>" if amount is not None else "")
         + (f"<p style='text-align:right;margin:0 8px'>Balance due {escape(currency)} {_money(document.balance_due)} by {document.due_date:%d %b %Y}</p>"
            if doc_type == "invoice" else "")
         + (f"<p style='margin:20px 0'><a href='{escape(link)}' style='background:#065f46;color:#fff;padding:10px 16px;border-radius:6px;"
@@ -116,7 +120,7 @@ def _body(workspace, doc_type: str, document, message: str, link: str) -> tuple[
 def send(workspace, *, doc_type: str, document, to: str, cc: str = "", subject: str, message: str, user) -> DocumentEmail:
     if not getattr(document, "number", ""):
         raise BusinessRuleError("Save and number the document before sending it.")
-    if getattr(document, "status", "") in ("draft",) and doc_type in ("invoice", "purchase_order"):
+    if getattr(document, "status", "") in ("draft",) and doc_type in ("invoice", "purchase_order", "service_order"):
         raise BusinessRuleError("Issue or approve the document before sending it.")
     if getattr(document, "status", "") == "void":
         raise BusinessRuleError("This document is void.")

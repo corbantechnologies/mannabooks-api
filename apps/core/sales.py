@@ -33,6 +33,8 @@ class LineIn:
     account: LedgerAccount
     product: Product | None = None
     discount_amount: Decimal = ZERO
+    unit: str = ""
+    unit_factor: Decimal = Decimal("1")
 
 
 def price(quantity, unit_price, discount_percent, tax_rate, prices_include_tax, discount_amount=ZERO) -> tuple[Decimal, Decimal, Decimal]:
@@ -55,6 +57,7 @@ def default_vat(workspace) -> TaxRate | None:
 def resolve_lines(workspace, rows: list[dict], customer=None) -> list[LineIn]:
     """Checked lines. A product without a price takes the customer's price-list price (or its normal price)."""
     from apps.pricelists.services import price_for
+    from apps.products.units import conversion
 
     if not rows:
         raise BusinessRuleError("Add at least one line.")
@@ -66,11 +69,13 @@ def resolve_lines(workspace, rows: list[dict], customer=None) -> list[LineIn]:
         if product is not None and product.workspace_id != workspace.id:
             raise BusinessRuleError(f"Line {n}: that product belongs to another workspace.")
         quantity = Decimal(row.get("quantity") or 1)
+        unit, factor, other = conversion(product, row.get("unit"), n)
         unit_price = row.get("unit_price")
         if unit_price is None:
             if product is None:
                 raise BusinessRuleError(f"Line {n}: enter a price.")
-            unit_price = price_for(product, price_list)
+            # a carton: its own price if set, else the (price-list) price of one piece times the pieces in it
+            unit_price = other.sale_price if other is not None and other.sale_price is not None else price_for(product, price_list) * factor
         unit_price = Decimal(unit_price)
         discount_amount = q2(row.get("discount_amount") or 0)
         if discount_amount < 0:
@@ -99,7 +104,7 @@ def resolve_lines(workspace, rows: list[dict], customer=None) -> list[LineIn]:
             raise BusinessRuleError(f"Line {n}: add a description.")
         lines.append(LineIn(description=description[:255], quantity=quantity, unit_price=unit_price,
                             discount_percent=discount, tax_rate=tax_rate, account=account, product=product,
-                            discount_amount=discount_amount))
+                            discount_amount=discount_amount, unit=unit[:20], unit_factor=factor))
     return lines
 
 
@@ -115,7 +120,7 @@ def write_lines(document, line_model, parent_field: str, lines: list[LineIn]) ->
         subtotal, tax_total, total = subtotal + net, tax_total + tax, total + gross
         objs.append(line_model(
             **{parent_field: document}, product=line.product, description=line.description, quantity=line.quantity,
-            unit_price=line.unit_price, discount_percent=line.discount_percent, discount_amount=line.discount_amount, tax_rate=line.tax_rate,
+            unit=line.unit, unit_factor=line.unit_factor, unit_price=line.unit_price, discount_percent=line.discount_percent, discount_amount=line.discount_amount, tax_rate=line.tax_rate,
             account=line.account, net_amount=net, tax_amount=tax, total_amount=gross, line_no=n,
         ))
     line_model.objects.bulk_create(objs)

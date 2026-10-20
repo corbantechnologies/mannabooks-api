@@ -34,8 +34,8 @@ def create(workspace, *, header: dict, rows: list[dict], reason: str, invoice: I
         header.setdefault("project", invoice.project)
         if not rows:  # credit the whole invoice
             rows = [
-                {"product": line.product, "description": line.description, "quantity": line.quantity, "unit_price": line.unit_price,
-                 "discount_percent": line.discount_percent, "discount_amount": line.discount_amount, "tax_rate": line.tax_rate, "account": line.account}
+                {"product": line.product, "description": line.description, "quantity": line.quantity, "unit": line.unit,
+                 "unit_price": line.unit_price, "discount_percent": line.discount_percent, "discount_amount": line.discount_amount, "tax_rate": line.tax_rate, "account": line.account}
                 for line in invoice.lines.select_related("tax_rate", "account", "product")
             ]
     note = CreditNote(

@@ -3,6 +3,8 @@ Abstract models shared by sales documents (invoices, cash sales, credit notes, q
 document app defines its own concrete model and line model from these, so every document has the same
 customer, currency, totals and line fields.
 """
+from decimal import Decimal
+
 from django.db import models
 
 from apps.core.models import BaseModel, WorkspaceModel
@@ -58,6 +60,8 @@ class SalesLine(BaseModel):
     product = models.ForeignKey("products.Product", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=14, decimal_places=3, default=1)
+    unit = models.CharField(max_length=20, blank=True, help_text="The unit sold or bought in; blank: the product's own unit")
+    unit_factor = models.DecimalField(max_digits=14, decimal_places=4, default=1, help_text="How many of the product's own unit one of `unit` holds")
     unit_price = models.DecimalField(max_digits=18, decimal_places=4, default=0)
     discount_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=18, decimal_places=2, default=0,
@@ -68,6 +72,11 @@ class SalesLine(BaseModel):
     tax_amount = models.DecimalField(**MONEY_FIELD, default=0)
     total_amount = models.DecimalField(**MONEY_FIELD, default=0)
     line_no = models.PositiveSmallIntegerField(default=0)
+
+    @property
+    def stock_quantity(self):
+        """The quantity in the product's own unit, which stock is kept in."""
+        return (self.quantity * (self.unit_factor or 1)).quantize(Decimal("0.001"))
 
     class Meta:
         abstract = True
@@ -80,6 +89,8 @@ class PurchaseLine(BaseModel):
     product = models.ForeignKey("products.Product", null=True, blank=True, on_delete=models.SET_NULL, related_name="+")
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=14, decimal_places=3, default=1)
+    unit = models.CharField(max_length=20, blank=True, help_text="The unit sold or bought in; blank: the product's own unit")
+    unit_factor = models.DecimalField(max_digits=14, decimal_places=4, default=1, help_text="How many of the product's own unit one of `unit` holds")
     unit_cost = models.DecimalField(max_digits=18, decimal_places=4, default=0)
     tax_rate = models.ForeignKey("taxrates.TaxRate", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     account = models.ForeignKey("ledgeraccounts.LedgerAccount", null=True, blank=True, on_delete=models.PROTECT, related_name="+",
@@ -88,6 +99,11 @@ class PurchaseLine(BaseModel):
     tax_amount = models.DecimalField(**MONEY_FIELD, default=0)
     total_amount = models.DecimalField(**MONEY_FIELD, default=0)
     line_no = models.PositiveSmallIntegerField(default=0)
+
+    @property
+    def stock_quantity(self):
+        """The quantity in the product's own unit, which stock is kept in."""
+        return (self.quantity * (self.unit_factor or 1)).quantize(Decimal("0.001"))
 
     class Meta:
         abstract = True

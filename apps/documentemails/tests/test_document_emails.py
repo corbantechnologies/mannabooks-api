@@ -47,3 +47,21 @@ def test_email_an_invoice_with_link_and_payment_options(api, ws, day, mailoutbox
     history = api.get(url(ws, "document-emails/"), doc).data
     assert history[0]["status"] == "sent" and history[0]["to"] == "accounts@baraka.co.ke"
     assert api.post(url(ws, "document-emails/"), {**doc, "to": "not-an-email", "subject": "x"}, format="json").status_code == 409
+
+
+def test_email_a_payment_receipt(api, ws, day, mailoutbox, django_capture_on_commit_callbacks):
+    cust = customer(api, ws, email="accounts@baraka.co.ke")
+    inv = draft_invoice(api, ws, cust, day).data
+    api.post(url(ws, f"invoices/{inv['id']}/issue/"))
+    cash = next(a for a in api.get(url(ws, "ledger-accounts/")).data if a["code"] == "1000")
+    pay = api.post(url(ws, "payments/"), {"customer_id": cust["id"], "payment_date": day, "amount": "1500", "method": "cash",
+                                          "deposit_account_id": cash["id"], "allocations": [{"invoice_id": inv["id"], "amount": "1160"}]}, format="json").data
+    doc = {"document_type": "payment", "object_id": pay["id"]}
+    draft = api.get(url(ws, "document-emails/draft/"), doc).data
+    assert draft["subject"].startswith("Payment receipt") and "received your payment" in draft["message"]
+    with django_capture_on_commit_callbacks(execute=True):
+        sent = api.post(url(ws, "document-emails/"), {**doc, "to": draft["to"], "subject": draft["subject"], "message": draft["message"]}, format="json")
+    assert sent.status_code == 201, sent.data
+    body = mailoutbox[0].body
+    assert f"Invoice {inv['number'] if inv.get('number') else ''}" in body or "Invoice INV-" in body
+    assert "Kept as credit on your account" in body and "Total KES 1,500.00" in body

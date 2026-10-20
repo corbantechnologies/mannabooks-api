@@ -7,6 +7,7 @@ DEFAULT_UNITS = [
     ("Piece", "pcs", "U"), ("Kilogram", "kg", "KG"), ("Gram", "g", ""), ("Litre", "l", ""), ("Millilitre", "ml", ""),
     ("Metre", "m", ""), ("Box", "box", ""), ("Pack", "pack", ""), ("Bag", "bag", ""), ("Dozen", "doz", ""),
     ("Hour", "hr", ""), ("Day", "day", ""), ("Service", "svc", ""),
+    ("Carton", "ctn", ""), ("Crate", "crate", ""), ("Bottle", "btl", ""), ("Shot", "shot", ""), ("Tonne", "t", ""),
 ]
 
 

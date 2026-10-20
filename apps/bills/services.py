@@ -26,7 +26,7 @@ def _rows_from_receipt(grn) -> list[dict]:
             continue
         tax_rate = line.order_line.tax_rate if line.order_line_id else line.product.tax_rate
         rows.append({"product": line.product, "description": line.description, "quantity": qty, "unit_cost": line.unit_cost,
-                     "tax_rate": tax_rate, "extra": {"goods_receipt_line": line, "order_line": line.order_line}})
+                     "unit": line.order_line.unit if line.order_line_id else "", "tax_rate": tax_rate, "extra": {"goods_receipt_line": line, "order_line": line.order_line}})
     if not rows:
         raise BusinessRuleError(f"Everything on {grn.number} is already billed.")
     return rows
@@ -40,7 +40,7 @@ def _rows_from_order(order) -> list[dict]:
         qty = line.quantity - line.billed_quantity
         if qty > 0:
             rows.append({"product": line.product, "description": line.description, "quantity": qty, "unit_cost": line.unit_cost,
-                         "tax_rate": line.tax_rate, **({"account": line.account} if line.account_id else {}), "extra": {"order_line": line}})
+                         "unit": line.unit, "tax_rate": line.tax_rate, **({"account": line.account} if line.account_id else {}), "extra": {"order_line": line}})
     if not rows:
         raise BusinessRuleError(f"Everything on {order.number} is already billed.")
     return rows
@@ -48,7 +48,7 @@ def _rows_from_order(order) -> list[dict]:
 
 def _rows_from_service_order(order) -> list[dict]:
     return [{"product": line.product, "description": line.description, "quantity": line.quantity, "unit_cost": line.unit_cost,
-             "tax_rate": line.tax_rate, "account": line.account} for line in order.lines.select_related("product", "tax_rate", "account")]
+             "unit": line.unit, "tax_rate": line.tax_rate, "account": line.account} for line in order.lines.select_related("product", "tax_rate", "account")]
 
 
 @transaction.atomic
@@ -138,7 +138,7 @@ def post(bill: Bill, user=None) -> Bill:
                 debit(system_account(workspace, "cogs"), line.net_amount)
         elif line.product is not None and line.product.track_inventory:
             warehouse = warehouse or bill.warehouse or default_warehouse(workspace)
-            move_in(product=line.product, warehouse=warehouse, quantity=line.quantity, unit_cost=purchases.net_unit_cost(line),
+            move_in(product=line.product, warehouse=warehouse, quantity=line.stock_quantity, unit_cost=purchases.net_stock_cost(line),
                     kind="purchase", source=source, date=bill.bill_date)
             debit(system_account(workspace, "inventory"), line.net_amount)
         else:

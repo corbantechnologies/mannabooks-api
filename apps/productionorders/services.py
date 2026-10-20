@@ -16,6 +16,8 @@ S = ProductionOrder.Status
 def plan(workspace, *, bom, quantity, warehouse, production_date, notes="", user=None) -> ProductionOrder:
     if not bom.is_active:
         raise BusinessRuleError("This recipe is inactive.")
+    if bom.product.made_to_order:
+        raise BusinessRuleError(f"{bom.product} is made to order: its ingredients come out of stock when it is sold, so it isn't produced ahead.")
     if quantity <= 0:
         raise BusinessRuleError("The quantity must be more than zero.")
     order = ProductionOrder.objects.create(workspace=workspace, created_by=user, number=next_value(workspace, "production_order"), bom=bom,

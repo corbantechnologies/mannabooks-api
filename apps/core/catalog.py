@@ -144,3 +144,34 @@ def grants(held: list[str], code: str) -> bool:
     """Whether a list of held permissions grants `code`."""
     module = code.split(".", 1)[0]
     return "*" in held or code in held or f"{module}.*" in held
+
+
+# Parts of MannaBooks a workspace can switch on and off (accounting, reports and the organisation are always on).
+APP_MODULES: dict[str, dict] = {
+    "sales": {"label": "Sales and invoicing", "description": "Customers, quotations, invoices, payments, credit notes, delivery notes."},
+    "pos": {"label": "Point of sale", "description": "The till with shifts, cash counts and loyalty points."},
+    "purchasing": {"label": "Purchasing", "description": "Suppliers, LPOs, goods received, bills and supplier payments."},
+    "inventory": {"label": "Stock and warehouses", "description": "Stock levels, warehouses, transfers, adjustments and stock takes."},
+    "manufacturing": {"label": "Manufacturing", "description": "Recipes and production."},
+    "banking": {"label": "Cash and banking", "description": "Bank, M-Pesa and cash accounts, expenses and reconciliation."},
+    "people": {"label": "Leave and payroll", "description": "Leave, payroll with PAYE, SHIF, NSSF and Housing Levy, payslips, work reports."},
+    "projects": {"label": "Projects", "description": "Job costing: income, costs and profit per job or contract."},
+    "control": {"label": "Budgets, approvals and assets", "description": "Budgets, cost centres, approval chains and fixed assets."},
+}
+
+# What a new business wants to do first; each switches on the modules it needs (changeable any time in Settings).
+GOALS: dict[str, dict] = {
+    "invoicing": {"label": "Send invoices and get paid", "description": "For service businesses, consultants and freelancers.",
+                  "modules": ["sales", "banking"]},
+    "shop": {"label": "Run a shop with a till", "description": "Retail shops, chemists, hardware stores, restaurants and bars.",
+             "modules": ["sales", "pos", "inventory", "purchasing", "banking"]},
+    "stock": {"label": "Manage stock and warehouses", "description": "Distributors and stores that mainly track goods.",
+              "modules": ["inventory", "purchasing"]},
+    "projects": {"label": "Run jobs and projects", "description": "Contractors, agencies, law and consulting firms.",
+                 "modules": ["sales", "purchasing", "banking", "projects"]},
+    "manufacturing": {"label": "Make products", "description": "Bakeries, factories, workshops.",
+                      "modules": ["sales", "purchasing", "inventory", "manufacturing", "banking"]},
+    "payroll": {"label": "Run payroll", "description": "Pay staff with PAYE, SHIF, NSSF and the Housing Levy done for you.",
+                "modules": ["people", "banking"]},
+    "everything": {"label": "Everything", "description": "The full system: every module switched on.", "modules": list(APP_MODULES)},
+}

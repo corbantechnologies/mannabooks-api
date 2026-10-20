@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
@@ -9,7 +11,15 @@ from apps.productcategories.models import ProductCategory
 from apps.taxrates.models import TaxRate
 from apps.warehouses.models import Warehouse
 
-from .models import Product
+from .models import Product, ProductUnit
+
+
+class ProductUnitSerializer(serializers.Serializer):
+    id = serializers.UUIDField(read_only=True)
+    unit = serializers.CharField(max_length=20)
+    factor = serializers.DecimalField(max_digits=14, decimal_places=4, help_text="How many of the product's own unit one of these holds")
+    sale_price = serializers.DecimalField(max_digits=18, decimal_places=4, allow_null=True, required=False,
+                                          help_text="Blank: the product's price times the factor")
 
 
 class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
@@ -21,6 +31,7 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True, default=None)
     stock_on_hand = serializers.DecimalField(max_digits=14, decimal_places=3, read_only=True, default=None,
                                              help_text="All warehouses; blank if stock isn't tracked")
+    units = ProductUnitSerializer(many=True, required=False, help_text="Other units it is bought or sold in, e.g. a carton of 24")
     opening_quantity = serializers.DecimalField(max_digits=14, decimal_places=3, min_value=0, write_only=True, required=False,
                                                 help_text="Stock already on the shelf, for a tracked product with no stock yet")
     opening_unit_cost = serializers.DecimalField(max_digits=18, decimal_places=4, min_value=0, write_only=True, required=False,
@@ -32,7 +43,7 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
         model = Product
         fields = [
             "id", "code", "name", "kind", "category_id", "category_name", "description", "unit", "sale_price", "cost_price", "tax_rate_id",
-            "tax_rate_name", "income_account_id", "track_inventory", "reorder_level", "stock_on_hand", "is_active", "created_at",
+            "tax_rate_name", "income_account_id", "track_inventory", "made_to_order", "reorder_level", "stock_on_hand", "units", "is_active", "created_at",
             "opening_quantity", "opening_unit_cost", "opening_warehouse_id",
         ]
         read_only_fields = ["id", "tax_rate_name", "category_name", "stock_on_hand", "created_at"]
@@ -57,6 +68,11 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
         kind = attrs.get("kind", getattr(self.instance, "kind", "goods"))
         if attrs.get("track_inventory") and kind != "goods":
             raise serializers.ValidationError({"track_inventory": ["Only goods have stock."]})
+        made = attrs.get("made_to_order", getattr(self.instance, "made_to_order", False))
+        if made and kind != "goods":
+            raise serializers.ValidationError({"made_to_order": ["Only goods are made from a recipe."]})
+        if made and attrs.get("track_inventory", getattr(self.instance, "track_inventory", False)):
+            raise serializers.ValidationError({"made_to_order": ["A made-to-order product has no stock of its own: its ingredients are taken out when it is sold. Untick Track stock."]})
         if self.instance and self.instance.track_inventory and attrs.get("track_inventory") is False:
             from apps.stockmovements.models import StockLevel
 
@@ -65,7 +81,43 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
         for field in ("sale_price", "cost_price"):
             if attrs.get(field) is not None and attrs[field] < 0:
                 raise serializers.ValidationError({field: ["Prices can't be negative."]})
+        base = attrs.get("unit", getattr(self.instance, "unit", "pcs"))
+        seen = set()
+        for row in attrs.get("units") or []:
+            row["unit"] = row["unit"].strip()
+            if row["unit"] == base:
+                raise serializers.ValidationError({"units": [f"{base} is the product's own unit; add a different one."]})
+            if row["unit"] in seen:
+                raise serializers.ValidationError({"units": [f"{row['unit']} is listed twice."]})
+            if row["factor"] <= 0 or (row.get("sale_price") is not None and row["sale_price"] < 0):
+                raise serializers.ValidationError({"units": [f"{row['unit']}: the quantity must be more than zero and the price not negative."]})
+            seen.add(row["unit"])
+        if self.instance is None:
+            self._category_defaults(attrs)
         return attrs
+
+    def _category_defaults(self, attrs):
+        """A new product in a category takes the category's VAT rate, income account and markup unless they are given."""
+        category = attrs.get("category")
+        if category is None:
+            return
+        given = self.initial_data
+        # left out or blank ("workspace default") both mean: use the category's
+        if not given.get("tax_rate_id") and category.setting("tax_rate") is not None:
+            attrs["tax_rate"] = category.setting("tax_rate")
+        if not given.get("income_account_id") and category.setting("income_account") is not None:
+            attrs["income_account"] = category.setting("income_account")
+        markup = category.setting("markup_percent")
+        if markup is not None and not attrs.get("sale_price") and attrs.get("cost_price"):
+            attrs["sale_price"] = (attrs["cost_price"] * (1 + markup / 100)).quantize(Decimal("0.01"))
+
+    def _save_units(self, product, rows):
+        if rows is None:
+            return
+        product.units.all().delete()
+        getattr(product, "_prefetched_objects_cache", {}).pop("units", None)
+        ProductUnit.objects.bulk_create(ProductUnit(product=product, unit=row["unit"], factor=row["factor"], sale_price=row.get("sale_price"))
+                                        for row in rows)
 
     OPENING = ("opening_quantity", "opening_unit_cost", "opening_warehouse")
 
@@ -94,13 +146,17 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         opening = {k: validated_data.pop(k) for k in self.OPENING if k in validated_data}
+        units = validated_data.pop("units", None)
         product = super().create(validated_data)
+        self._save_units(product, units)
         self._opening(product, opening)
         return product
 
     @transaction.atomic
     def update(self, instance, validated_data):
         opening = {k: validated_data.pop(k) for k in self.OPENING if k in validated_data}
+        units = validated_data.pop("units", None)
         product = super().update(instance, validated_data)
+        self._save_units(product, units)
         self._opening(product, opening)
         return product

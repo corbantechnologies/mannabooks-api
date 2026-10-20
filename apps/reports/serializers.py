@@ -161,3 +161,20 @@ class PeriodSummarySerializer(serializers.Serializer):
     top_customers = TopCustomerSerializer(many=True)
     top_products = TopProductSerializer(many=True)
     by_month = PeriodMonthSerializer(many=True)
+
+
+class CategoryRowSerializer(serializers.Serializer):
+    category_id = serializers.UUIDField(allow_null=True)
+    name = serializers.CharField()
+    products = serializers.IntegerField()
+    stock_value = serializers.DecimalField(**M)
+    sales = serializers.DecimalField(**M)
+    share = serializers.DecimalField(max_digits=7, decimal_places=2, help_text="Share of the period's sales, in percent")
+
+
+class CategoryReportSerializer(serializers.Serializer):
+    from_date = serializers.DateField()
+    to_date = serializers.DateField()
+    rows = CategoryRowSerializer(many=True)
+    total_sales = serializers.DecimalField(**M)
+    total_stock_value = serializers.DecimalField(**M)

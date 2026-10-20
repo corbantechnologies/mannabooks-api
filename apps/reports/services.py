@@ -1,6 +1,6 @@
 from django.db.models import Q, Sum
 
-from apps.core.money import ZERO
+from apps.core.money import ZERO, q2
 from apps.journals.models import JournalLine
 from apps.ledgeraccounts.models import LedgerAccount
 
@@ -253,6 +253,49 @@ def vat_summary(workspace, *, from_date, to_date) -> dict:
 
 
 
+# ---------------------------------------------------------------- by category
+def by_category(workspace, *, from_date, to_date) -> dict:
+    """Per product category: how many products, the stock value now, and net sales (less credit notes) in the period."""
+    from collections import defaultdict
+
+    from django.db.models import Count, F
+
+    from apps.creditnotes.models import CreditNoteLine
+    from apps.invoices.models import InvoiceLine
+    from apps.productcategories.models import ProductCategory
+    from apps.products.models import Product
+    from apps.receipts.models import ReceiptLine
+    from apps.stockmovements.models import StockLevel
+
+    rows = defaultdict(lambda: {"products": 0, "stock_value": ZERO, "sales": ZERO})
+    names = {c.pk: c.name for c in ProductCategory.objects.filter(workspace=workspace)}
+    for row in Product.objects.filter(workspace=workspace, is_active=True).values("category_id").annotate(n=Count("id")):
+        rows[row["category_id"]]["products"] = row["n"]
+    for row in StockLevel.objects.filter(workspace=workspace).values("product__category_id").annotate(v=Sum(F("quantity") * F("average_cost"))):
+        rows[row["product__category_id"]]["stock_value"] += row["v"] or ZERO
+    sources = (
+        (InvoiceLine, "invoice", {"invoice__status__in": ["issued", "partially_paid", "paid"]}, 1),
+        (ReceiptLine, "receipt", {"receipt__status": "issued"}, 1),
+        (CreditNoteLine, "credit_note", {"credit_note__status": "issued"}, -1),
+    )
+    for model, parent, status, sign in sources:
+        lines = model.objects.filter(**{f"{parent}__workspace": workspace, f"{parent}__issue_date__gte": from_date,
+                                        f"{parent}__issue_date__lte": to_date}, **status)
+        for row in lines.values("product__category_id").annotate(a=Sum(F("net_amount") * F(f"{parent}__exchange_rate"))):
+            rows[row["product__category_id"]]["sales"] += sign * (row["a"] or ZERO)
+    total_sales = sum((r["sales"] for r in rows.values()), ZERO)
+    result = []
+    for key, r in rows.items():
+        if not (r["products"] or r["stock_value"] or r["sales"]):
+            continue
+        result.append({"category_id": key, "name": names.get(key, "No category"), "products": r["products"],
+                       "stock_value": q2(r["stock_value"]), "sales": q2(r["sales"]),
+                       "share": q2(r["sales"] / total_sales * 100) if total_sales else ZERO})
+    result.sort(key=lambda r: (-r["sales"], -r["stock_value"]))
+    return {"from_date": from_date, "to_date": to_date, "rows": result, "total_sales": q2(total_sales),
+            "total_stock_value": q2(sum((r["stock_value"] for r in result), ZERO))}
+
+
 # ---------------------------------------------------------------- period summary (the dashboard)
 def period_summary(workspace, *, from_date, to_date) -> dict:
     """The headline numbers for a month or a year: profit, cash, sales, buying, VAT, payroll, who owes whom, and the top sellers."""
@@ -300,7 +343,7 @@ def period_summary(workspace, *, from_date, to_date) -> dict:
     products = defaultdict(lambda: {"name": "", "quantity": ZERO, "amount": ZERO})
     for model, parent in ((InvoiceLine, "invoice"), (ReceiptLine, "receipt")):
         lines = model.objects.filter(**{f"{parent}__in": invoices if parent == "invoice" else receipts})
-        for row in lines.values("product_id", "description").annotate(q=Sum("quantity"), a=Sum(F("net_amount") * F(f"{parent}__exchange_rate"))):
+        for row in lines.values("product_id", "description").annotate(q=Sum(F("quantity") * F("unit_factor")), a=Sum(F("net_amount") * F(f"{parent}__exchange_rate"))):
             key = row["product_id"] or row["description"]
             p = products[key]
             p["name"] = p["name"] or row["description"]

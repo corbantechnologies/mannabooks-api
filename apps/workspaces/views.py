@@ -69,6 +69,7 @@ class WorkspaceContextView(generics.GenericAPIView):
     serializer_class = WorkspaceContextSerializer
 
     def get(self, request, workspace):
+        from apps.core.catalog import APP_MODULES, GOALS
         from apps.departments.models import Department
         from apps.fiscalyears.models import FiscalYear
         from apps.fiscalyears.services import ended_unclosed
@@ -95,5 +96,7 @@ class WorkspaceContextView(generics.GenericAPIView):
                 for y in FiscalYear.objects.filter(workspace=request.workspace).order_by("-start_date")
             ],
             "unclosed_years": [y.name for y in ended_unclosed(request.workspace)],
+            "module_catalog": [{"key": k, **v} for k, v in APP_MODULES.items()],
+            "goal_catalog": [{"key": k, **v} for k, v in GOALS.items()],
         }
         return Response(self.get_serializer(data).data)

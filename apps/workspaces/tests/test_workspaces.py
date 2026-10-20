@@ -81,3 +81,16 @@ def test_registering_for_vat_makes_16_percent_the_default(workspace, owner, clie
     assert default() == "VAT16"
     api.patch(url, {"vat_registered": False}, format="json")
     assert default() == "NONVAT"
+
+
+def test_goal_switches_on_modules(workspace, owner, client_for):
+    api = client_for(owner)
+    url = f"/api/v1/w/{workspace.slug}/"
+    assert api.get(url).data["modules"] == []  # empty: everything on, as for existing workspaces
+    shop = api.patch(url, {"business_goal": "shop"}, format="json")
+    assert shop.status_code == 200 and shop.data["modules"] == ["sales", "pos", "purchasing", "inventory", "banking"]
+    picked = api.patch(url, {"modules": ["banking", "sales", "sales"]}, format="json").data
+    assert picked["modules"] == ["sales", "banking"]
+    assert api.patch(url, {"modules": ["spaceships"]}, format="json").status_code == 400
+    context = api.get(f"/api/v1/w/{workspace.slug}/context/").data
+    assert {m["key"] for m in context["module_catalog"]} >= {"sales", "people"} and context["goal_catalog"][0]["key"] == "invoicing"

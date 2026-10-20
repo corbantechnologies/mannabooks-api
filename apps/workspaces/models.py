@@ -25,6 +25,8 @@ class Workspace(BaseModel):
     fiscal_year_start_month = models.PositiveSmallIntegerField(
         default=1, validators=[MinValueValidator(1), MaxValueValidator(12)]
     )
+    modules = models.JSONField(default=list, blank=True, help_text="Switched-on modules (keys of APP_MODULES); empty means all")
+    business_goal = models.CharField(max_length=20, blank=True, help_text="What the business chose to do first")
     is_active = models.BooleanField(default=True)
 
     class Meta:

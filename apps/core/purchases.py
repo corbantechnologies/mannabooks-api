@@ -25,9 +25,13 @@ class PurchaseLineIn:
     account: object
     product: object = None
     extra: dict | None = None
+    unit: str = ""
+    unit_factor: Decimal = Decimal("1")
 
 
 def resolve_lines(workspace, rows: list[dict], *, accounts: bool = True) -> list[PurchaseLineIn]:
+    from apps.products.units import conversion
+
     if not rows:
         raise BusinessRuleError("Add at least one line.")
     fallback_vat = default_vat(workspace) if workspace.vat_registered else None
@@ -39,8 +43,9 @@ def resolve_lines(workspace, rows: list[dict], *, accounts: bool = True) -> list
         quantity = Decimal(row.get("quantity") or 1)
         if quantity <= 0:
             raise BusinessRuleError(f"Line {n}: the quantity must be more than zero.")
+        unit, factor, _ = conversion(product, row.get("unit"), n)
         unit_cost = row.get("unit_cost")
-        unit_cost = Decimal(product.cost_price if unit_cost is None and product is not None else unit_cost or 0)
+        unit_cost = Decimal(product.cost_price * factor if unit_cost is None and product is not None else unit_cost or 0)
         if unit_cost < 0:
             raise BusinessRuleError(f"Line {n}: the cost can't be negative.")
         tax_rate = row["tax_rate"] if "tax_rate" in row else (product.tax_rate if product and product.tax_rate_id else fallback_vat)
@@ -61,7 +66,7 @@ def resolve_lines(workspace, rows: list[dict], *, accounts: bool = True) -> list
         if not description:
             raise BusinessRuleError(f"Line {n}: add a description.")
         lines.append(PurchaseLineIn(description=description[:255], quantity=quantity, unit_cost=unit_cost, tax_rate=tax_rate,
-                                    account=account, product=product, extra=row.get("extra") or {}))
+                                    account=account, product=product, extra=row.get("extra") or {}, unit=unit[:20], unit_factor=factor))
     return lines
 
 
@@ -75,6 +80,7 @@ def write_lines(document, line_model, parent_field: str, lines: list[PurchaseLin
         net, tax, gross = price(line.quantity, line.unit_cost, 0, line.tax_rate, document.prices_include_tax)
         subtotal, tax_total, total = subtotal + net, tax_total + tax, total + gross
         objs.append(line_model(**{parent_field: document}, product=line.product, description=line.description, quantity=line.quantity,
+                               unit=line.unit, unit_factor=line.unit_factor,
                                unit_cost=line.unit_cost, tax_rate=line.tax_rate, account=line.account, net_amount=net, tax_amount=tax,
                                total_amount=gross, line_no=n, **(line.extra or {})))
     saved = line_model.objects.bulk_create(objs)
@@ -84,5 +90,11 @@ def write_lines(document, line_model, parent_field: str, lines: list[PurchaseLin
 
 
 def net_unit_cost(line) -> Decimal:
-    """The line's cost per unit before VAT (what stock is valued at)."""
+    """The line's cost per unit (the line's unit, e.g. a carton) before VAT."""
     return q2(line.net_amount / line.quantity) if line.quantity else ZERO
+
+
+def net_stock_cost(line) -> Decimal:
+    """The cost of one of the product's own unit before VAT (what stock is valued at)."""
+    quantity = line.stock_quantity
+    return (line.net_amount / quantity).quantize(Decimal("0.0001")) if quantity else ZERO

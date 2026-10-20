@@ -65,7 +65,7 @@ def convert(quotation: Quotation, user=None):
     if quotation.status == Quotation.Status.DECLINED:
         raise BusinessRuleError("This quotation was declined.")
     rows = [
-        {"product": line.product, "description": line.description, "quantity": line.quantity, "unit_price": line.unit_price,
+        {"product": line.product, "description": line.description, "quantity": line.quantity, "unit": line.unit, "unit_price": line.unit_price,
          "discount_percent": line.discount_percent, "discount_amount": line.discount_amount, "tax_rate": line.tax_rate, "account": line.account}
         for line in quotation.lines.select_related("product", "tax_rate", "account")
     ]

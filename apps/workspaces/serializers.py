@@ -11,12 +11,26 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "name", "slug", "legal_name", "kra_pin", "vat_registered", "vat_number", "currency",
             "country", "timezone", "phone", "email", "address", "logo_url", "fiscal_year_start_month",
-            "created_at",
+            "modules", "business_goal", "created_at",
         ]
         read_only_fields = ["id", "slug", "created_at"]
 
     def validate_kra_pin(self, value):
         return clean_pin(value)
+
+    def validate_modules(self, value):
+        from apps.core.catalog import APP_MODULES
+
+        if not isinstance(value, list) or any(m not in APP_MODULES for m in value):
+            raise serializers.ValidationError(f"Use these module names: {', '.join(APP_MODULES)}.")
+        return [m for m in APP_MODULES if m in value]  # keep the catalogue's order, no repeats
+
+    def validate_business_goal(self, value):
+        from apps.core.catalog import GOALS
+
+        if value and value not in GOALS:
+            raise serializers.ValidationError(f"Use one of: {', '.join(GOALS)}.")
+        return value
 
     def validate_fiscal_year_start_month(self, value):
         if self.instance is not None and value != self.instance.fiscal_year_start_month:
@@ -42,6 +56,11 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        from apps.core.catalog import APP_MODULES, GOALS
+
+        goal = attrs.get("business_goal")
+        if goal and "modules" not in attrs:  # choosing a goal switches on what it needs
+            attrs["modules"] = [m for m in APP_MODULES if m in GOALS[goal]["modules"]]
         vat_registered = attrs.get("vat_registered", getattr(self.instance, "vat_registered", False))
         kra_pin = attrs.get("kra_pin", getattr(self.instance, "kra_pin", ""))
         if vat_registered and not kra_pin:
@@ -78,3 +97,5 @@ class WorkspaceContextSerializer(serializers.Serializer):
     etims_enabled = serializers.BooleanField(help_text="KRA eTIMS signing is switched on for the platform")
     fiscal_years = serializers.ListField(child=serializers.DictField(), help_text="Every financial year, latest first: id, name, start_date, end_date, status")
     unclosed_years = serializers.ListField(child=serializers.CharField(), help_text="Years that have ended but are not closed yet")
+    module_catalog = serializers.ListField(child=serializers.DictField(), help_text="Modules that can be switched on: key, label, description")
+    goal_catalog = serializers.ListField(child=serializers.DictField(), help_text="Starting goals: key, label, description, modules")

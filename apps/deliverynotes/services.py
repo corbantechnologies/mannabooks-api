@@ -46,7 +46,7 @@ def save(workspace, *, data: dict, rows: list[dict] | None, user=None, note: Del
                             delivery_address=customer.address)
         if not rows and invoice is not None:  # deliver everything on the invoice
             rows = [{"product": line.product, "description": line.description, "quantity": line.quantity,
-                     "unit": line.product.unit if line.product else ""} for line in invoice.lines.select_related("product")]
+                     "unit": line.unit or (line.product.unit if line.product else "")} for line in invoice.lines.select_related("product")]
     for key, value in data.items():
         setattr(note, key, value)
     note.customer = customer

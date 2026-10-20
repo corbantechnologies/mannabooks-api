@@ -24,16 +24,22 @@ def _post_cogs(document, doc_type: str, value, *, returned=False, user=None):
 
 @transaction.atomic
 def issue(document, doc_type: str, user=None) -> None:
-    """Take a sale's stock items out of the branch's warehouse and post their cost."""
+    """Take a sale's stock items (and the ingredients of made-to-order items) out of the branch's warehouse and post their cost."""
+    from apps.billsofmaterials.services import ingredients_for
     from apps.warehouses.services import default_warehouse
 
-    tracked = [line for line in document.lines.select_related("product") if line.product and line.product.track_inventory]
-    if not tracked:
+    lines = [line for line in document.lines.select_related("product") if line.product]
+    tracked = [line for line in lines if line.product.track_inventory]
+    made = [line for line in lines if line.product.made_to_order and not line.product.track_inventory]
+    if not tracked and not made:
         return
     warehouse = default_warehouse(document.workspace, document.branch)
     source, total = Source(doc_type, document.pk, document.number), ZERO
-    for line in tracked:
-        total += -move_out(product=line.product, warehouse=warehouse, quantity=line.quantity, kind="sale", source=source,
+    takes = [(line.product, line.stock_quantity) for line in tracked]
+    for line in made:  # made when sold: the recipe's ingredients leave stock instead
+        takes += [(item, qty) for item, qty in ingredients_for(line.product, line.stock_quantity) if qty > 0]
+    for product, quantity in takes:
+        total += -move_out(product=product, warehouse=warehouse, quantity=quantity, kind="sale", source=source,
                            date=document.issue_date).value
     _post_cogs(document, doc_type, total, user=user)
 
@@ -60,6 +66,6 @@ def take_back(note, user=None) -> None:
 
         level = StockLevel.objects.filter(product=line.product, warehouse=warehouse).first()
         cost = level.average_cost if level and level.average_cost else line.product.cost_price
-        total += move_in(product=line.product, warehouse=warehouse, quantity=line.quantity, unit_cost=cost, kind="sale_return",
+        total += move_in(product=line.product, warehouse=warehouse, quantity=line.stock_quantity, unit_cost=cost, kind="sale_return",
                          source=source, date=note.issue_date).value
     _post_cogs(note, "credit_note", total, returned=True, user=user)

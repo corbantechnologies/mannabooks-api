@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.core.fields import WorkspaceRelatedField
@@ -12,22 +13,57 @@ class ComponentSerializer(serializers.Serializer):
     component_name = serializers.CharField(source="component.name", read_only=True)
     unit = serializers.CharField(source="component.unit", read_only=True)
     quantity = serializers.DecimalField(max_digits=14, decimal_places=4)
+    unit_cost = serializers.SerializerMethodField(help_text="What one unit of the ingredient costs now")
+    cost = serializers.SerializerMethodField(help_text="This ingredient's cost for one batch")
+
+    def _row(self, line):
+        return next((r for r in self.parent.parent._costing(line.bom)["lines"] if r["line_id"] == line.pk), {})
+
+    def get_unit_cost(self, line) -> str | None:
+        value = self._row(line).get("unit_cost")
+        return None if value is None else str(value)
+
+    def get_cost(self, line) -> str | None:
+        value = self._row(line).get("cost")
+        return None if value is None else str(value)
+
+
+class CostingSerializer(serializers.Serializer):
+    batch_cost = serializers.DecimalField(max_digits=18, decimal_places=2)
+    unit_cost = serializers.DecimalField(max_digits=18, decimal_places=4, help_text="Cost of one finished unit")
+    sale_price = serializers.DecimalField(max_digits=18, decimal_places=4)
+    margin = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    margin_percent = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
 
 
 class BillOfMaterialsSerializer(serializers.ModelSerializer):
     product_id = WorkspaceRelatedField(Product, source="product")
     product_name = serializers.CharField(source="product.name", read_only=True)
     lines = ComponentSerializer(many=True)
+    made_to_order = serializers.BooleanField(source="product.made_to_order", read_only=True)
+    costing = serializers.SerializerMethodField()
+
+    def _costing(self, bom):
+        cache = self.__dict__.setdefault("_costs", {})
+        if bom.pk not in cache:
+            from .services import costing
+
+            cache[bom.pk] = costing(bom)
+        return cache[bom.pk]
+
+    @extend_schema_field(CostingSerializer)
+    def get_costing(self, bom):
+        return CostingSerializer(self._costing(bom)).data
 
     class Meta:
         model = BillOfMaterials
-        fields = ["id", "product_id", "product_name", "name", "output_quantity", "notes", "is_active", "lines", "created_at"]
-        read_only_fields = ["id", "product_name", "created_at"]
+        fields = ["id", "product_id", "product_name", "name", "output_quantity", "notes", "is_active", "lines", "made_to_order", "costing", "created_at"]
+        read_only_fields = ["id", "product_name", "made_to_order", "costing", "created_at"]
 
     def validate(self, attrs):
         product = attrs.get("product", getattr(self.instance, "product", None))
-        if product is not None and not product.track_inventory:
-            raise serializers.ValidationError({"product_id": ["The finished product must track stock."]})
+        if product is not None and not (product.track_inventory or product.made_to_order):
+            raise serializers.ValidationError({"product_id": ["The finished product must track stock, or be made to order."]})
         if attrs.get("output_quantity") is not None and attrs["output_quantity"] <= 0:
             raise serializers.ValidationError({"output_quantity": ["Must be more than zero."]})
         lines = attrs.get("lines")

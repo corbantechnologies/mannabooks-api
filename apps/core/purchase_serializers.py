@@ -15,6 +15,9 @@ class PurchaseLineSerializer(serializers.Serializer):
     product_tracked = serializers.BooleanField(source="product.track_inventory", read_only=True, default=False)
     description = serializers.CharField(max_length=255, required=False, allow_blank=True)
     quantity = serializers.DecimalField(max_digits=14, decimal_places=3)
+    unit = serializers.CharField(max_length=20, required=False, allow_blank=True,
+                                 help_text="Blank: the product's own unit. Another unit must be one of the product's other units.")
+    unit_factor = serializers.DecimalField(max_digits=14, decimal_places=4, read_only=True)
     unit_cost = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
     tax_rate_id = WorkspaceRelatedField(TaxRate, source="tax_rate", allow_null=True, required=False)
     tax_rate_name = serializers.CharField(source="tax_rate.name", read_only=True, default=None)

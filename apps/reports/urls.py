@@ -8,5 +8,6 @@ urlpatterns = [
     path("balance-sheet/", views.BalanceSheetView.as_view(), name="report-balance-sheet"),
     path("aged/<str:kind>/", views.AgedReportView.as_view(), name="report-aged"),
     path("vat/", views.VatSummaryView.as_view(), name="report-vat"),
+    path("by-category/", views.CategoryReportView.as_view(), name="report-by-category"),
     path("period/", views.PeriodSummaryView.as_view(), name="report-period"),
 ]

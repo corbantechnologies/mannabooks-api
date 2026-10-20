@@ -14,6 +14,9 @@ class SalesLineSerializer(serializers.Serializer):
     product_id = WorkspaceRelatedField(Product, source="product", allow_null=True, required=False)
     description = serializers.CharField(max_length=255, required=False, allow_blank=True)
     quantity = serializers.DecimalField(max_digits=14, decimal_places=3, default=1)
+    unit = serializers.CharField(max_length=20, required=False, allow_blank=True,
+                                 help_text="Blank: the product's own unit. Another unit must be one of the product's other units.")
+    unit_factor = serializers.DecimalField(max_digits=14, decimal_places=4, read_only=True)
     unit_price = serializers.DecimalField(max_digits=18, decimal_places=4, required=False)
     discount_percent = serializers.DecimalField(max_digits=5, decimal_places=2, default=0)
     discount_amount = serializers.DecimalField(max_digits=18, decimal_places=2, default=0)
