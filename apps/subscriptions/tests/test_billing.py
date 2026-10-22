@@ -170,6 +170,7 @@ def test_full_access_for_a_person(workspace, owner, make_user, client_for):
     assert granted.status_code == 200 and granted.data["full_access"]
     sub = Subscription.objects.get(workspace=workspace)
     assert sub.complimentary and sub.plan.key == "kampuni" and sub.status == "active"
+    owner.refresh_from_db()  # full access was given through the API, on a fresh copy of the user
     second = create_workspace(owner, name="Second Biz", currency="KES")  # businesses they start later are covered too
     assert Subscription.objects.get(workspace=second).complimentary
     assert admin.post(act, {"action": "make_staff"}, format="json").status_code == 409  # only a superuser

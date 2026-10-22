@@ -29,14 +29,14 @@ class Workspace(BaseModel):
     business_goal = models.CharField(max_length=20, blank=True, help_text="What the business chose to do first")
     is_active = models.BooleanField(default=True)
     blocked_at = models.DateTimeField(null=True, blank=True, help_text="Blocked by MannaBooks staff; nobody can use it until unblocked")
-    blocked_reason = models.CharField(max_length=255, blank=True)
+    blocked_reason = models.CharField(max_length=255, blank=True, db_default="")
     # online shop
-    store_enabled = models.BooleanField(default=False, help_text="Show the online shop at /shop/<slug>")
-    store_intro = models.TextField(blank=True, help_text="A few words at the top of the shop")
-    store_allow_pickup = models.BooleanField(default=True)
-    store_allow_delivery = models.BooleanField(default=True)
-    store_delivery_fee = models.DecimalField(max_digits=18, decimal_places=2, default=0)
-    store_pay_on_delivery = models.BooleanField(default=True, help_text="Let customers pay when they collect or receive the order")
+    store_enabled = models.BooleanField(default=False, db_default=False, help_text="Show the online shop at /shop/<slug>")
+    store_intro = models.TextField(blank=True, db_default="", help_text="A few words at the top of the shop")
+    store_allow_pickup = models.BooleanField(default=True, db_default=True)
+    store_allow_delivery = models.BooleanField(default=True, db_default=True)
+    store_delivery_fee = models.DecimalField(max_digits=18, decimal_places=2, default=0, db_default=0)
+    store_pay_on_delivery = models.BooleanField(default=True, db_default=True, help_text="Let customers pay when they collect or receive the order")
     group = models.ForeignKey("companygroups.CompanyGroup", null=True, blank=True, on_delete=models.SET_NULL, related_name="workspaces",
                               help_text="The company group this business is reported with")
 

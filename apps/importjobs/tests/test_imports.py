@@ -57,4 +57,4 @@ def test_import_check_then_commit_and_export(workspace, owner, client_for):
     text = exported.content.decode("utf-8-sig")
     assert exported.status_code == 200 and "Baraka Supplies" in text and text.splitlines()[0].startswith("number,name")
     assert api.get(url(workspace, "exports/products/")).content.decode("utf-8-sig").count("\n") == 3
-    assert api.get(url(workspace, "imports/")).data["count"] == 7
+    assert api.get(url(workspace, "imports/")).data["count"] == 6  # the refused opening balances (no date) never became a job

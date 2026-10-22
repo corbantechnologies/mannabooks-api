@@ -1,14 +1,19 @@
 """Sign-in rules: issuing tokens, Google sign-in and password resets."""
+import logging
+
 from django.conf import settings
 from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.db import transaction
 from django.utils.encoding import force_bytes, force_str
+from django.utils.html import escape
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from rest_framework.exceptions import AuthenticationFailed, ValidationError
+from rest_framework.exceptions import APIException, AuthenticationFailed, ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
+
+logger = logging.getLogger("mannabooks.accounts")
 
 
 def issue_tokens(user: User) -> dict:
@@ -57,6 +62,12 @@ def user_from_google(claims: dict) -> User:
     return user
 
 
+class EmailNotSent(APIException):
+    status_code = 503
+    default_code = "email_failed"
+    default_detail = "We couldn't send the email just now. Please try again in a few minutes."
+
+
 def send_password_reset(email: str) -> None:
     """Email a reset link if the address has an account. Silent otherwise, so emails can't be probed."""
     user = User.objects.filter(email=email.strip().lower(), is_active=True).first()
@@ -65,13 +76,26 @@ def send_password_reset(email: str) -> None:
     uid = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
     link = f"{settings.FRONTEND_URL}/reset-password?uid={uid}&token={token}"
-    send_mail(
-        "Reset your MannaBooks password",
-        f"Hello {user.full_name},\n\nReset your password here (valid for 3 days):\n{link}\n\n"
-        "If you did not ask for this, ignore this email.",
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-    )
+    text = "\n\n".join([
+        f"Hello {user.full_name},",
+        f"Someone asked to reset the password for your MannaBooks account. Choose a new password here (the link works for 3 days):\n{link}",
+        "If it wasn't you, ignore this email; your password stays the same.",
+        "MannaBooks",
+    ])
+    html = (f'<p style="font:15px sans-serif">Hello {escape(user.full_name)},</p>'
+            '<p style="font:15px sans-serif">Someone asked to reset the password for your MannaBooks account.</p>'
+            f'<p><a href="{link}" style="display:inline-block;background:#065f46;color:#fff;padding:12px 20px;border-radius:6px;'
+            'font:600 15px sans-serif;text-decoration:none">Choose a new password</a></p>'
+            '<p style="font:13px sans-serif;color:#57534e">The link works for 3 days. If it wasn&#39;t you, ignore this email; your password stays the same.</p>')
+    message = EmailMultiAlternatives("Reset your MannaBooks password", text, settings.DEFAULT_FROM_EMAIL, [user.email])
+    message.attach_alternative(html, "text/html")
+    try:
+        message.send()
+    except Exception as err:  # the provider refused it (unverified sender, bad key) or couldn't be reached
+        logger.exception("Password reset email to user %s could not be sent", user.pk)
+        raise EmailNotSent() from err
+    if settings.EMAIL_BACKEND.endswith("console.EmailBackend") and not settings.DEBUG:
+        logger.error("Password reset email was only printed to the log: set RESEND_API_KEY (or SMTP settings) to send real email")
 
 
 def reset_password(uid: str, token: str, password: str) -> User:

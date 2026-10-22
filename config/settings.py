@@ -369,6 +369,11 @@ RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 if RESEND_API_KEY:
     EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
     ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
+if not DEBUG and EMAIL_BACKEND.endswith("console.EmailBackend"):
+    import sys
+
+    print("WARNING: no email provider is set (RESEND_API_KEY or EMAIL_BACKEND); emails such as password resets are only "
+          "written to this log.", file=sys.stderr)
 
 # --- Production hardening ---
 if not DEBUG:

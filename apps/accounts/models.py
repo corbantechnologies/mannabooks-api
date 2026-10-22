@@ -42,8 +42,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     email_verified = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False, help_text="MannaBooks staff: can use the platform admin (/admin).")
-    full_access = models.BooleanField(default=False, help_text="Given by MannaBooks: every business this person owns is on the top plan, free")
-    full_access_note = models.CharField(max_length=255, blank=True, help_text="Why, e.g. partner accountant")
+    full_access = models.BooleanField(default=False, db_default=False, help_text="Given by MannaBooks: every business this person owns is on the top plan, free")
+    full_access_note = models.CharField(max_length=255, blank=True, db_default="", help_text="Why, e.g. partner accountant")
     date_joined = models.DateTimeField(default=timezone.now)
 
     objects = UserManager()
