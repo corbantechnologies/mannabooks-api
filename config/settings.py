@@ -379,6 +379,7 @@ if not DEBUG and EMAIL_BACKEND.endswith("console.EmailBackend"):
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_REDIRECT_EXEMPT = [r"^health/$"]  # Railway's healthcheck calls over plain HTTP inside its network
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 60 * 60 * 24 * 30
