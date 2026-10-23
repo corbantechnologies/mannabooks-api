@@ -69,8 +69,12 @@ def stk_push(conn, *, phone: str, amount: int, reference: str, description: str)
 
 
 def register_c2b(conn) -> dict:
-    """Ask Safaricom to tell MannaBooks about every payment made straight to the paybill or till."""
-    return _post(conn, "/mpesa/c2b/v1/registerurl", {
+    """
+    Ask Safaricom to tell MannaBooks about every payment made straight to the paybill or till. Production only accepts
+    v2 (v1 there fails with "Invalid Access Token"); v2 masks the payer's phone, and matching uses the account number.
+    """
+    version = "v2" if conn.environment == "production" else "v1"
+    return _post(conn, f"/mpesa/c2b/{version}/registerurl", {
         "ShortCode": conn.till_number if conn.shortcode_type == "till" else conn.shortcode, "ResponseType": "Completed",
         "ConfirmationURL": callback_url(conn, "c2b/confirmation/"), "ValidationURL": callback_url(conn, "c2b/validation/"),
     })
