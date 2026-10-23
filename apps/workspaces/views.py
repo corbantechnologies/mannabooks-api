@@ -109,6 +109,7 @@ class WorkspaceContextView(generics.GenericAPIView):
             "pdf_enabled": bool(settings.PDF_SERVICE_URL and settings.PDF_SERVICE_KEY),
             "blocked": bool(request.workspace.blocked_at),
             "blocked_reason": request.workspace.blocked_reason,
+            "limited_department": _limit(request),
         }
         sub = subscription_of(request.workspace)
         data["subscription"] = {
@@ -117,3 +118,10 @@ class WorkspaceContextView(generics.GenericAPIView):
             "complimentary": sub.complimentary, "can_write": sub.can_write, "modules": sub.plan.modules, "features": sub.plan.features,
         }
         return Response(self.get_serializer(data).data)
+
+
+def _limit(request) -> dict | None:
+    from apps.core.scoping import limited_department
+
+    department = limited_department(request)
+    return {"id": str(department.id), "name": department.name} if department else None

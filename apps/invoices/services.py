@@ -57,6 +57,40 @@ def save_draft(workspace, *, header: dict, rows: list[dict] | None, user=None, i
     return invoice
 
 
+def opening_entry_date(workspace, on):
+    """A document from before MannaBooks is posted on its own date, or on the first open day of the books if that is later."""
+    from apps.periods.models import AccountingPeriod
+
+    first_open = AccountingPeriod.objects.filter(workspace=workspace, status="open").order_by("start_date").values_list("start_date", flat=True).first()
+    return max(on, first_open) if first_open else on
+
+
+@transaction.atomic
+def bring_in_open(workspace, *, customer, number: str, issue_date, due_date, amount, user=None) -> Invoice:
+    """
+    An invoice still unpaid in the previous system. It keeps its own number (so the customer can pay against it), shows
+    as owed, and posts against opening balance equity: its sale and VAT were recorded before MannaBooks.
+    """
+    from apps.journals.services import LineInput
+
+    check_customer(customer)
+    label = f"Unpaid invoice {number} brought in"
+    invoice = Invoice(workspace=workspace, created_by=user, customer=customer, issue_date=issue_date, due_date=due_date, currency=workspace.currency)
+    invoice.save()
+    rows = [{"description": f"{label} from the previous system", "quantity": 1, "unit_price": amount, "tax_rate": None}]
+    sales.write_lines(invoice, InvoiceLine, "invoice", sales.resolve_lines(workspace, rows, customer=customer))
+    invoice.number, invoice.status = number, Invoice.Status.ISSUED
+    invoice.issued_at, invoice.issued_by = timezone.now(), user
+    invoice.exchange_rate = sales.document_rate(workspace, invoice.currency, issue_date)
+    invoice.amount_paid, invoice.balance_due = ZERO, invoice.total
+    invoice.save()
+    replace_for_source(workspace, **SOURCE, source_id=str(invoice.pk), entry_date=opening_entry_date(workspace, issue_date),
+                       description=f"{label}: {customer}", reference=number, user=user,
+                       lines=[LineInput(account=system_account(workspace, "receivable"), debit=invoice.total, description=label),
+                              LineInput(account=system_account(workspace, "opening_balance_equity"), credit=invoice.total, description=label)])
+    return invoice
+
+
 @transaction.atomic
 def issue(invoice: Invoice, user=None) -> Invoice:
     invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)

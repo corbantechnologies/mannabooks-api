@@ -1,5 +1,5 @@
 """
-Bringing lists in from a spreadsheet (CSV), and taking them out.
+Bringing lists in from a spreadsheet (CSV), and taking them out. More kinds live in kinds.py.
 
 Imports check every row with the same rules as the screens (the same serializers), then import all of them or none.
 Rows matching an existing record (customer or supplier name, product name or code) are skipped, so importing the
@@ -33,8 +33,18 @@ TEMPLATES = {
 VAT_CODES = "VAT16, VAT8, ZERO, EXEMPT or NONVAT"
 
 
+def _more():
+    from . import kinds
+
+    return kinds
+
+
+def template_columns(kind: str):
+    return TEMPLATES.get(kind) or _more().TEMPLATES[kind]
+
+
 def template_csv(kind: str) -> str:
-    head, example = TEMPLATES[kind]
+    head, example = template_columns(kind)
     out = io.StringIO()
     writer = csv.writer(out)
     writer.writerow(head)
@@ -192,6 +202,8 @@ def run(request, kind: str, upload, *, commit: bool, as_of=None) -> ImportJob:
                 imported, skipped = _import_parties(request, kind, rows, errors)
             elif kind == K.PRODUCTS:
                 imported, skipped = _import_products(request, rows, errors, commit)
+            elif kind in _more().IMPORTERS:
+                imported, skipped = _more().IMPORTERS[kind](request, rows, errors)
             else:
                 imported = _import_opening(workspace, rows, errors, as_of, user)
             if errors or not commit:
