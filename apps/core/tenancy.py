@@ -81,7 +81,9 @@ class WorkspaceScopedMixin:
     def get_queryset(self):
         if getattr(self, "swagger_fake_view", False):  # schema generation: no request workspace
             return self.queryset.none()
-        return self.workspace_queryset()
+        from .scoping import scope_queryset
+
+        return scope_queryset(self.workspace_queryset(), self.request)  # someone limited to a department sees its rows only
 
     def workspace_queryset(self):
         """Rows of this view's model in the request's workspace. Override to add joins or filters."""
@@ -107,5 +109,10 @@ class WorkspaceScopedMixin:
 
 
 def workspace_object(model, request, **lookup):
-    """Fetch a row of `model` inside the request's workspace (404 otherwise)."""
-    return get_object_or_404(model, workspace=request.workspace, **lookup)
+    """Fetch a row of `model` inside the request's workspace, and inside the caller's department if they are limited to one (404 otherwise)."""
+    from django.db.models import QuerySet
+
+    from .scoping import scope_queryset
+
+    qs = model if isinstance(model, QuerySet) else model.objects.all()  # a model, or a queryset with its joins
+    return get_object_or_404(scope_queryset(qs.filter(workspace=request.workspace), request), **lookup)

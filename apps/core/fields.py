@@ -15,4 +15,9 @@ class WorkspaceRelatedField(serializers.PrimaryKeyRelatedField):
     def get_queryset(self):
         workspace = self.context.get("workspace")
         qs = self.model.objects.all()
-        return qs.filter(workspace=workspace) if workspace is not None else qs.none()
+        if workspace is None:
+            return qs.none()
+        from .scoping import scope_queryset
+
+        request = self.context.get("request")
+        return scope_queryset(qs.filter(workspace=workspace), request) if request is not None else qs.filter(workspace=workspace)

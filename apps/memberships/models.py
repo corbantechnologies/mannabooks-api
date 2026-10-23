@@ -22,6 +22,10 @@ class Membership(WorkspaceModel):
         max_digits=14, decimal_places=2, default=Decimal("0.00"),
         help_text="Documents above this amount go to the module in-charge for approval.",
     )
+    limited_department = models.ForeignKey(
+        "departments.Department", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+        help_text="Sees only this department's documents and reports (and what they created). Blank: the whole business.",
+    )
 
     class Meta:
         ordering = ["user__full_name"]

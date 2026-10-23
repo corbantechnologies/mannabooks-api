@@ -38,6 +38,39 @@ class ReportSectionSerializer(serializers.Serializer):
     compare_total = serializers.DecimalField(**M)
 
 
+class SideBySideColumnSerializer(serializers.Serializer):
+    id = serializers.UUIDField(allow_null=True, help_text="Null: lines not tagged with any")
+    name = serializers.CharField()
+
+
+class SideBySideRowSerializer(serializers.Serializer):
+    account_id = serializers.UUIDField()
+    code = serializers.CharField()
+    name = serializers.CharField()
+    amounts = serializers.ListField(child=serializers.DecimalField(**M), help_text="One per column")
+    total = serializers.DecimalField(**M)
+
+
+class SideBySideSectionSerializer(serializers.Serializer):
+    key = serializers.CharField()
+    label = serializers.CharField()
+    rows = SideBySideRowSerializer(many=True)
+    totals = serializers.ListField(child=serializers.DecimalField(**M))
+    total = serializers.DecimalField(**M)
+
+
+class ProfitAndLossByDimensionSerializer(serializers.Serializer):
+    from_date = serializers.DateField()
+    to_date = serializers.DateField()
+    dimension = serializers.CharField()
+    dimension_label = serializers.CharField()
+    columns = SideBySideColumnSerializer(many=True)
+    sections = SideBySideSectionSerializer(many=True)
+    gross_profit = serializers.ListField(child=serializers.DecimalField(**M), help_text="One per column, then the total")
+    operating_profit = serializers.ListField(child=serializers.DecimalField(**M))
+    net_profit = serializers.ListField(child=serializers.DecimalField(**M))
+
+
 class ProfitAndLossSerializer(serializers.Serializer):
     from_date = serializers.DateField()
     to_date = serializers.DateField()

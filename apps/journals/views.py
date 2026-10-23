@@ -24,6 +24,12 @@ def _line_inputs(rows):
 class JournalMixin(WorkspaceScopedMixin):
     queryset = JournalEntry.objects.all()
 
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        from apps.core.scoping import deny_if_limited
+
+        deny_if_limited(request, "The journal")
+
     def entry(self) -> JournalEntry:
         return workspace_object(
             JournalEntry.objects.select_related("posted_by", "reversal_of").prefetch_related("lines__account"),

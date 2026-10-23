@@ -100,6 +100,11 @@ class ContextSubscriptionSerializer(serializers.Serializer):
     features = serializers.ListField(child=serializers.CharField())
 
 
+class LimitSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField()
+
+
 class WorkspaceContextSerializer(serializers.Serializer):
     """Everything the web app needs about the caller inside one workspace."""
 
@@ -123,3 +128,4 @@ class WorkspaceContextSerializer(serializers.Serializer):
     blocked = serializers.BooleanField(help_text="Blocked by MannaBooks staff")
     blocked_reason = serializers.CharField(allow_blank=True)
     subscription = ContextSubscriptionSerializer()
+    limited_department = LimitSerializer(allow_null=True, help_text="Set when this person sees only one department's documents and reports")

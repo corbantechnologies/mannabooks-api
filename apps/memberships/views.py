@@ -41,6 +41,15 @@ class MembershipDetailView(MembershipQuerysetMixin, generics.RetrieveUpdateDestr
         losing_owner = member.is_owner and (new_role.slug != "owner" or new_status != Membership.Status.ACTIVE)
         if losing_owner and _active_owners(self.request.workspace).count() <= 1:
             raise BusinessRuleError("A workspace needs at least one active Owner. Make someone else Owner first.")
+        if "limited_department" in serializer.validated_data:
+            new_limit = serializer.validated_data["limited_department"]
+            if new_limit != member.limited_department:
+                if member.pk == caller.pk:
+                    raise BusinessRuleError("Someone else must change which department you can see.")
+                if caller.limited_department_id is not None and not caller.is_owner:
+                    raise BusinessRuleError("You are limited to a department, so you can't change what others see.")
+            if new_limit is not None and new_role.slug == "owner":
+                raise BusinessRuleError("Owners always see the whole business.")
         super().perform_update(serializer)
 
     def perform_destroy(self, instance):

@@ -34,6 +34,10 @@ class LedgerAccountMixin(WorkspaceScopedMixin):
     serializer_class = LedgerAccountSerializer
 
     def workspace_queryset(self):
+        from apps.core.scoping import limited_department
+
+        if limited_department(self.request) is not None:  # the accounts, for choosing them; not the whole business's balances
+            return super().workspace_queryset().annotate(debit_total=ZERO_DEC, credit_total=ZERO_DEC).order_by("code")
         as_of = parse_date(self.request.query_params.get("as_of"), "as_of")
         posted = ~Q(lines__entry__status="draft")
         if as_of:
@@ -75,6 +79,9 @@ class AccountLedgerView(WorkspaceScopedMixin, generics.GenericAPIView):
         OpenApiParameter("from", OpenApiTypes.DATE), OpenApiParameter("to", OpenApiTypes.DATE),
     ])
     def get(self, request, workspace, pk):
+        from apps.core.scoping import deny_if_limited
+
+        deny_if_limited(request, "An account's ledger")
         account = workspace_object(LedgerAccount, request, pk=pk)
         start = parse_date(request.query_params.get("from"), "from")
         end = parse_date(request.query_params.get("to"), "to")

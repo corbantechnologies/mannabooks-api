@@ -98,6 +98,33 @@ def save_draft(workspace, *, header: dict, rows: list[dict] | None, user=None, b
 
 
 @transaction.atomic
+def bring_in_open(workspace, *, supplier, supplier_invoice_number: str, bill_date, due_date, amount, user=None) -> Bill:
+    """
+    A supplier invoice still unpaid in the previous system: owed to the supplier and posted against opening balance
+    equity (its cost and VAT were recorded before MannaBooks). The supplier's invoice number is kept for paying it.
+    """
+    from apps.invoices.services import opening_entry_date
+
+    number = supplier_invoice_number.strip()
+    if Bill.objects.filter(supplier=supplier, supplier_invoice_number__iexact=number).exclude(status__in=[S.DRAFT, S.VOID]).exists():
+        raise BusinessRuleError(f"Invoice {number} from {supplier} is already recorded.")
+    label = f"Unpaid bill {number} from {supplier} brought in"
+    bill = Bill(workspace=workspace, created_by=user, supplier=supplier, bill_date=bill_date, due_date=due_date, supplier_invoice_number=number)
+    bill.save()
+    rows = [{"description": f"Unpaid bill {number} brought in from the previous system", "quantity": 1, "unit_cost": amount, "tax_rate": None,
+             "account": system_account(workspace, "cogs")}]  # shown on the bill only; the posting below is what counts
+    purchases.write_lines(bill, BillLine, "bill", purchases.resolve_lines(workspace, rows))
+    bill.number = next_value(workspace, "bill")
+    bill.status, bill.amount_paid, bill.balance_due = S.POSTED, ZERO, bill.total
+    bill.save()
+    replace_for_source(workspace, **SOURCE, source_id=str(bill.pk), entry_date=opening_entry_date(workspace, bill_date), reference=bill.number,
+                       description=label, user=user,
+                       lines=[LineInput(account=system_account(workspace, "opening_balance_equity"), debit=bill.total, description=label),
+                              LineInput(account=system_account(workspace, "payable"), credit=bill.total, description=label)])
+    return bill
+
+
+@transaction.atomic
 def post(bill: Bill, user=None) -> Bill:
     from apps.warehouses.services import default_warehouse
 

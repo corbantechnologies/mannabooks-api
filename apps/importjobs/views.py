@@ -12,9 +12,11 @@ from apps.core.tenancy import WorkspaceScopedMixin
 from apps.ledgeraccounts.views import parse_date
 
 from . import services
+from .kinds import PERMS as MORE_PERMS
 from .models import ImportJob
 
-IMPORT_PERM = {"customers": "customers.manage", "suppliers": "suppliers.manage", "products": "products.manage", "opening_balances": "openingbalances.manage"}
+IMPORT_PERM = {"customers": "customers.manage", "suppliers": "suppliers.manage", "products": "products.manage", "opening_balances": "openingbalances.manage",
+               **MORE_PERMS}
 
 
 class ImportJobSerializer(serializers.ModelSerializer):

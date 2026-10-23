@@ -46,9 +46,23 @@ PL_SECTIONS = [
 ]
 
 
-def _pl_totals(workspace, from_date, to_date, *, cost_center=None, project=None, branch=None) -> dict:
+def department_lines(department) -> Q:
+    """Journal lines of a department: tagged with it, or with one of its cost centres."""
+    return Q(department=department) | Q(department__isnull=True, cost_center__department=department)
+
+
+def _pl_filter(workspace, from_date, to_date, limit_department=None) -> Q:
     f = Q(entry__workspace=workspace) & ~Q(entry__status="draft") & Q(entry__entry_date__gte=from_date, entry__entry_date__lte=to_date)
     f &= Q(account__account_type__in=["income", "expense"])
+    if limit_department is not None:
+        f &= department_lines(limit_department)
+    return f
+
+
+def _pl_totals(workspace, from_date, to_date, *, cost_center=None, project=None, branch=None, department=None, limit_department=None) -> dict:
+    f = _pl_filter(workspace, from_date, to_date, limit_department)
+    if department is not None:
+        f &= department_lines(department)
     if cost_center is not None:
         f &= Q(cost_center=cost_center)
     if project is not None:
@@ -66,6 +80,7 @@ def _section_of(account) -> str:
 
 
 def profit_and_loss(workspace, *, from_date, to_date, compare_from=None, compare_to=None, **dims) -> dict:
+    """`dims`: cost_center, project, branch or department to report on one of them; limit_department for someone limited to one."""
     now = _pl_totals(workspace, from_date, to_date, **dims)
     before = _pl_totals(workspace, compare_from, compare_to, **dims) if compare_from and compare_to else {}
     accounts = LedgerAccount.objects.filter(workspace=workspace, pk__in=set(now) | set(before)).order_by("code")
@@ -101,6 +116,69 @@ def profit_and_loss(workspace, *, from_date, to_date, compare_from=None, compare
         "sections": [sections[key] for key, _, _ in PL_SECTIONS],
         "gross_profit": gross, "operating_profit": operating, "net_profit": net,
         "compare_gross_profit": c_gross, "compare_operating_profit": c_operating, "compare_net_profit": c_net,
+    }
+
+
+# ---------------------------------------------------------------- P&L side by side
+DIMENSIONS = {
+    "department": ("departments.Department", "Departments"),
+    "cost_center": ("costcenters.CostCenter", "Cost centres"),
+    "branch": ("branches.Branch", "Branches"),
+    "project": ("projects.Project", "Projects"),
+}
+
+
+def profit_and_loss_by(workspace, *, from_date, to_date, dimension: str, limit_department=None) -> dict:
+    """
+    Profit and loss with one column per department (or cost centre, branch or project), a column for lines not
+    tagged with any, and the total. A line takes its department from its cost centre when it has none of its own.
+    """
+    from django.apps import apps as django_apps
+    from django.db.models import F
+    from django.db.models.functions import Coalesce
+
+    key = Coalesce("department", "cost_center__department") if dimension == "department" else F(dimension)
+    rows = (JournalLine.objects.filter(_pl_filter(workspace, from_date, to_date, limit_department)).annotate(dim=key)
+            .values("account", "dim").annotate(debit=Sum("debit"), credit=Sum("credit")))
+    model = django_apps.get_model(DIMENSIONS[dimension][0])
+    ids = {r["dim"] for r in rows if r["dim"] is not None}
+    items = sorted(model.objects.filter(pk__in=ids), key=lambda x: (getattr(x, "code", "") or "", x.name.lower()))
+    columns = [{"id": str(i.pk), "name": f"{i.code} {i.name}".strip() if getattr(i, "code", "") else i.name} for i in items]
+    position = {i.pk: n for n, i in enumerate(items)}
+    if any(r["dim"] is None for r in rows):
+        columns.append({"id": None, "name": "Not tagged"})
+    width = len(columns)
+    accounts = {a.pk: a for a in LedgerAccount.objects.filter(workspace=workspace, pk__in={r["account"] for r in rows})}
+    sections = {k: {"key": k, "label": label, "rows": {}, "totals": [ZERO] * width, "total": ZERO} for k, label, _ in PL_SECTIONS}
+    for r in rows:
+        account = accounts[r["account"]]
+        income = account.account_type == "income"
+        amount = ((r["credit"] or ZERO) - (r["debit"] or ZERO)) if income else ((r["debit"] or ZERO) - (r["credit"] or ZERO))
+        if amount == ZERO:
+            continue
+        col = position[r["dim"]] if r["dim"] is not None else width - 1
+        sec = sections[_section_of(account)]
+        row = sec["rows"].setdefault(account.pk, {"account_id": account.pk, "code": account.code, "name": account.name, "amounts": [ZERO] * width,
+                                                  "total": ZERO})
+        row["amounts"][col] += amount
+        row["total"] += amount
+        sec["totals"][col] += amount
+        sec["total"] += amount
+
+    def line(key):
+        return sections[key]["totals"] + [sections[key]["total"]]
+
+    def combine(*parts):
+        return [sum(values) for values in zip(*parts, strict=True)]
+
+    neg = lambda values: [-v for v in values]  # noqa: E731
+    gross = combine(line("income"), neg(line("cost_of_sales")))
+    operating = combine(gross, neg(line("expense")))
+    net = combine(operating, line("other_income"), neg(line("other_expense")))
+    return {
+        "from_date": from_date, "to_date": to_date, "dimension": dimension, "dimension_label": DIMENSIONS[dimension][1], "columns": columns,
+        "sections": [{**sections[k], "rows": sorted(sections[k]["rows"].values(), key=lambda x: x["code"])} for k, _, _ in PL_SECTIONS],
+        "gross_profit": gross, "operating_profit": operating, "net_profit": net,
     }
 
 
