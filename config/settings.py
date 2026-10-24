@@ -326,6 +326,8 @@ PUBLIC_API_URL = os.environ.get("PUBLIC_API_URL", "http://localhost:8000").rstri
 
 # --- PDFs: the pdf-service (Playwright) Railway service. Blank: browser printing only, emails without a PDF ---
 PDF_ENGINE = os.environ.get("PDF_ENGINE", "playwright")  # playwright (Chromium in this service), service, or off
+if (BASE_DIR / ".playwright").is_dir():  # where build.sh installs Chromium on Railway; elsewhere Playwright's own folder
+    os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", str(BASE_DIR / ".playwright"))
 PDF_SERVICE_URL = os.environ.get("PDF_SERVICE_URL", "")
 PDF_SERVICE_KEY = os.environ.get("PDF_SERVICE_KEY", "")
 
