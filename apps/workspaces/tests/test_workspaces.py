@@ -94,3 +94,17 @@ def test_goal_switches_on_modules(workspace, owner, client_for):
     assert api.patch(url, {"modules": ["spaceships"]}, format="json").status_code == 400
     context = api.get(f"/api/v1/w/{workspace.slug}/context/").data
     assert {m["key"] for m in context["module_catalog"]} >= {"sales", "people"} and context["goal_catalog"][0]["key"] == "invoicing"
+
+
+def test_confirming_the_financial_year(workspace, owner, client_for):
+    api = client_for(owner)
+    path = f"/api/v1/w/{workspace.slug}/"
+    assert api.get(path).data["fiscal_year_confirmed"] is False
+    assert api.patch(path, {"fiscal_year_confirmed": True}, format="json").data["fiscal_year_confirmed"] is True  # the default month is right
+    workspace.refresh_from_db()
+    workspace.fiscal_year_confirmed = False
+    workspace.save(update_fields=["fiscal_year_confirmed"])
+    res = api.patch(path, {"fiscal_year_start_month": 7}, format="json")  # choosing a month confirms it too
+    assert res.data["fiscal_year_confirmed"] is True and res.data["fiscal_year_start_month"] == 7
+    ctx = api.get(f"/api/v1/w/{workspace.slug}/context/").data
+    assert ctx["workspace"]["fiscal_year_confirmed"] is True
