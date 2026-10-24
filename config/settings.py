@@ -122,6 +122,7 @@ INSTALLED_APPS = [
     "apps.companygroups",
     "apps.intercompanytransactions",
     "apps.onlineorders",
+    "apps.catalogues",
     "apps.plans",
     "apps.coupons",
     "apps.subscriptions",
@@ -286,6 +287,7 @@ SPECTACULAR_SETTINGS = {
         "OnlineOrderStatusEnum": "apps.onlineorders.models.OnlineOrder.Status",
         "FulfilmentEnum": "apps.onlineorders.models.OnlineOrder.Fulfilment",
         "OnlinePaymentMethodEnum": "apps.onlineorders.models.OnlineOrder.PaymentMethod",
+        "CatalogueQuoteModeEnum": "apps.catalogues.models.Catalogue.QuoteMode",
         "IntercompanyKindEnum": "apps.intercompanytransactions.models.IntercompanyTransaction.Kind",
         "PartyKindEnum": "apps.customers.models.Customer.Kind",
         "MembershipStatusEnum": "apps.memberships.models.Membership.Status",
@@ -323,6 +325,7 @@ ETIMS_ENABLED = env_bool("ETIMS_ENABLED", False)
 PUBLIC_API_URL = os.environ.get("PUBLIC_API_URL", "http://localhost:8000").rstrip("/")
 
 # --- PDFs: the pdf-service (Playwright) Railway service. Blank: browser printing only, emails without a PDF ---
+PDF_ENGINE = os.environ.get("PDF_ENGINE", "playwright")  # playwright (Chromium in this service), service, or off
 PDF_SERVICE_URL = os.environ.get("PDF_SERVICE_URL", "")
 PDF_SERVICE_KEY = os.environ.get("PDF_SERVICE_KEY", "")
 

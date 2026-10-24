@@ -55,6 +55,10 @@ def change_status(quotation: Quotation, action: str) -> Quotation:
         raise BusinessRuleError(f"A {quotation.get_status_display().lower()} quotation can't be marked {target.label.lower()}.")
     quotation.status = target
     quotation.save(update_fields=["status", "updated_at"])
+    if action == "send":
+        from apps.catalogues.services import quote_sent
+
+        quote_sent(quotation)
     return quotation
 
 

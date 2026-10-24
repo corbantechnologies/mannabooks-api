@@ -1,8 +1,13 @@
 """
-Documents as PDF: the API renders HTML from one template and the PDF service (pdf-service/, Playwright) prints it.
-Without PDF_SERVICE_URL the app still prints from the browser and emails go without an attachment.
+Documents as PDF: the API renders HTML from one template and Chromium prints it to A4.
+
+PDF_ENGINE picks the printer:
+- "playwright" (default): Chromium on this machine, installed at build time (`playwright install --with-deps chromium`);
+- "service": the separate PDF service (pdf-service/), at PDF_SERVICE_URL with PDF_SERVICE_KEY;
+- "off": no PDFs; people print from the browser and emails go without an attachment.
 """
 import base64
+import functools
 import logging
 
 import requests
@@ -20,8 +25,53 @@ PARTY_LABEL = {"purchase_order": "Supplier", "service_order": "Supplier", "suppl
                "delivery_note": "Deliver to"}
 
 
+MARGINS = {"top": "14mm", "bottom": "16mm", "left": "12mm", "right": "12mm"}
+CHROMIUM_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
+
+
 def enabled() -> bool:
-    return bool(settings.PDF_SERVICE_URL and settings.PDF_SERVICE_KEY)
+    if settings.PDF_ENGINE == "service":
+        return bool(settings.PDF_SERVICE_URL and settings.PDF_SERVICE_KEY)
+    return settings.PDF_ENGINE == "playwright" and _chromium_installed()
+
+
+@functools.cache
+def _chromium_installed() -> bool:
+    """Checked once per process: is Playwright's Chromium on this machine?"""
+    try:
+        from playwright.sync_api import sync_playwright
+
+        with sync_playwright() as p:
+            p.chromium.launch(args=CHROMIUM_ARGS).close()  # the headless shell has no executable_path of its own: try it
+            return True
+    except Exception:  # noqa: BLE001 - no Playwright, or no browser: PDFs are simply off
+        logger.warning("Chromium for Playwright isn't installed; PDF downloads are off")
+        return False
+
+
+def _print_here(html: str) -> bytes:
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=CHROMIUM_ARGS)
+        try:
+            context = browser.new_context(java_script_enabled=False, offline=True)  # everything is inlined: no network
+            page = context.new_page()
+            page.set_content(html, wait_until="load", timeout=20000)
+            return page.pdf(format="A4", print_background=True, margin=MARGINS)
+        finally:
+            browser.close()
+
+
+def _print_by_service(html: str) -> bytes:
+    try:
+        res = requests.post(f"{settings.PDF_SERVICE_URL.rstrip('/')}/render", json={"html": html},
+                            headers={"X-Render-Key": settings.PDF_SERVICE_KEY}, timeout=45)
+    except requests.RequestException as exc:
+        raise BusinessRuleError("The PDF service couldn't be reached. Try again, or use Print.") from exc
+    if res.status_code != 200:
+        logger.error("PDF service answered %s", res.status_code)
+    return res.content if res.status_code == 200 else b""
 
 
 def _money(value) -> str:
@@ -94,15 +144,18 @@ def html_for(workspace, doc_type: str, document) -> str:
 def render(workspace, doc_type: str, document) -> bytes:
     if not enabled():
         raise BusinessRuleError("PDF downloads aren't set up yet. Use Print and choose Save as PDF.")
-    try:
-        res = requests.post(f"{settings.PDF_SERVICE_URL.rstrip('/')}/render", json={"html": html_for(workspace, doc_type, document)},
-                            headers={"X-Render-Key": settings.PDF_SERVICE_KEY}, timeout=45)
-    except requests.RequestException as exc:
-        raise BusinessRuleError("The PDF service couldn't be reached. Try again, or use Print.") from exc
-    if res.status_code != 200 or not res.content.startswith(b"%PDF"):
-        logger.error("PDF service answered %s", res.status_code)
+    html = html_for(workspace, doc_type, document)
+    if settings.PDF_ENGINE == "service":
+        pdf = _print_by_service(html)
+    else:
+        try:
+            pdf = _print_here(html)
+        except Exception:  # noqa: BLE001 - a browser crash or timeout must not become a 500
+            logger.exception("Chromium couldn't print %s %s", doc_type, document.pk)
+            pdf = b""
+    if not pdf.startswith(b"%PDF"):
         raise BusinessRuleError("The PDF couldn't be made. Try again, or use Print.")
-    return res.content
+    return pdf
 
 
 def filename(doc_type: str, document) -> str:

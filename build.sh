@@ -9,6 +9,11 @@ set -o pipefail
 echo "==> Checking Django configuration"
 python manage.py check --deploy --fail-level ERROR
 
+echo "==> Installing Chromium for PDF downloads (Playwright)"
+# The browser goes inside the app folder (PLAYWRIGHT_BROWSERS_PATH, set in nixpacks.toml) so it ships with the build;
+# --with-deps adds the system libraries Chromium needs.
+python -m playwright install --with-deps --only-shell chromium
+
 echo "==> Collecting static files"
 python manage.py collectstatic --noinput
 

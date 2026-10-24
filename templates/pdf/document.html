@@ -16,11 +16,17 @@
   .meta td { padding: 1px 0 1px 12px; }
   .party { margin: 22px 0 14px; display: flex; justify-content: space-between; gap: 24px; }
   .label { font-size: 8pt; text-transform: uppercase; letter-spacing: .6px; color: #78716c; margin-bottom: 3px; }
-  table.lines { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.lines { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  table.lines tr { page-break-inside: avoid; }
+  table.lines th.r, table.lines td.r { padding-left: 14px; text-align: right; }
+  table.lines .n { width: 22px; color: #78716c; padding-right: 4px; }
+  table.lines .num { width: 13%; }
+  table.lines .qty { width: 9%; }
   table.lines th { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px; color: #57534e; text-align: left; border-bottom: 1.5px solid #1c1917; padding: 6px 6px; }
   table.lines td { padding: 6px; border-bottom: 1px solid #e7e5e4; vertical-align: top; }
   .r { text-align: right; white-space: nowrap; }
-  .totals { margin-left: auto; margin-top: 10px; border-collapse: collapse; min-width: 42%; }
+  .totals { margin-left: auto; margin-top: 10px; border-collapse: collapse; min-width: 42%; font-variant-numeric: tabular-nums; }
+  .totals td.r { padding-left: 24px; }
   .totals td { padding: 4px 6px; }
   .totals .grand td { border-top: 1.5px solid #1c1917; font-weight: 700; font-size: 12pt; }
   .box { border: 1px solid #e7e5e4; border-radius: 6px; padding: 10px 12px; margin-top: 16px; page-break-inside: avoid; }
@@ -64,13 +70,14 @@
   {% endif %}
 
   <table class="lines">
-    <thead><tr><th>Description</th><th class="r">Qty</th>{% if priced %}<th class="r">Price</th><th class="r">VAT</th>{% endif %}<th class="r">{% if money %}Amount{% endif %}</th></tr></thead>
+    <thead><tr><th class="n">#</th><th>Description</th><th class="r qty">Qty</th>{% if priced %}<th class="r num">Unit price</th><th class="r num">VAT</th>{% endif %}<th class="r num">{% if money %}Amount{% endif %}</th></tr></thead>
     <tbody>
       {% for line in lines %}
       <tr>
+        <td class="n">{{ forloop.counter }}</td>
         <td>{{ line.description }}</td>
         <td class="r">{{ line.quantity }}</td>
-        {% if priced %}<td class="r">{{ line.price }}</td><td class="r">{{ line.tax }}</td>{% endif %}
+        {% if priced %}<td class="r">{{ line.price }}</td><td class="r">{% if line.tax and line.tax != "0.00" %}{{ line.tax }}{% else %}<span class="muted">-</span>{% endif %}</td>{% endif %}
         <td class="r">{{ line.amount }}</td>
       </tr>
       {% endfor %}

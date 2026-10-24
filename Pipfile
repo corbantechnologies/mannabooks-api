@@ -21,6 +21,7 @@ requests = "*"
 cryptography = "*"
 django-anymail = {extras = ["resend"], version = "*"}
 django-storages = {extras = ["s3"], version = "*"}
+playwright = "*"
 
 [dev-packages]
 pytest = "*"
