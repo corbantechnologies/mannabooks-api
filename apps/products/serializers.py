@@ -160,3 +160,7 @@ class ProductSerializer(AutoCodeMixin, serializers.ModelSerializer):
         self._save_units(product, units)
         self._opening(product, opening)
         return product
+
+
+class ProductBulkSerializer(serializers.Serializer):
+    products = ProductSerializer(many=True, help_text="Up to 50 new products; saved together or not at all")
