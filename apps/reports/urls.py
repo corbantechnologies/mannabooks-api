@@ -10,5 +10,6 @@ urlpatterns = [
     path("aged/<str:kind>/", views.AgedReportView.as_view(), name="report-aged"),
     path("vat/", views.VatSummaryView.as_view(), name="report-vat"),
     path("by-category/", views.CategoryReportView.as_view(), name="report-by-category"),
+    path("glance/", views.GlanceView.as_view(), name="report-glance"),
     path("period/", views.PeriodSummaryView.as_view(), name="report-period"),
 ]

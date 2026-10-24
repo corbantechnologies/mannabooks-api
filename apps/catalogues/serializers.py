@@ -81,6 +81,7 @@ class PublicCatalogueSerializer(serializers.Serializer):
     show_stock = serializers.BooleanField()
     reviews_first = serializers.BooleanField()
     expires_on = serializers.DateField(allow_null=True)
+    pdf_available = serializers.BooleanField()
     items = CatalogueItemSerializer(many=True)
 
 
@@ -89,13 +90,19 @@ class CataloguePickSerializer(serializers.Serializer):
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
 
 
+class CatalogueWishSerializer(serializers.Serializer):
+    description = serializers.CharField(max_length=200, allow_blank=True)  # blank rows are skipped
+    quantity = serializers.DecimalField(max_digits=12, decimal_places=3, required=False, default=1)
+
+
 class CatalogueQuoteRequestSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=150)
     company = serializers.CharField(max_length=200, required=False, allow_blank=True, default="")
     phone = serializers.CharField(max_length=30)
     email = serializers.EmailField(required=False, allow_blank=True, default="")
     notes = serializers.CharField(required=False, allow_blank=True, default="")
-    lines = CataloguePickSerializer(many=True)
+    lines = CataloguePickSerializer(many=True, required=False, default=list)
+    wishes = CatalogueWishSerializer(many=True, required=False, default=list, help_text="Things the client couldn't find, in their own words")
 
 
 class CatalogueQuoteLinkSerializer(serializers.Serializer):

@@ -15,7 +15,7 @@ from apps.core.money import ZERO, q2
 
 from .models import Catalogue
 
-MAX_LINES, MAX_QTY = 200, Decimal("100000")
+MAX_LINES, MAX_QTY, MAX_WISHES = 200, Decimal("100000"), 10
 
 
 def open_catalogue(token: str) -> Catalogue:
@@ -121,13 +121,20 @@ def match_customer(workspace, *, name: str, company: str, phone: str, email: str
 
 # ---------------------------------------------------------------- the client's request
 @transaction.atomic
-def request_quote(catalogue: Catalogue, *, name: str, company: str = "", phone: str, email: str = "", notes: str = "", rows: list[dict]):
-    """A quotation written from the client's picks: sent at once, or a draft for the team to review."""
+def request_quote(catalogue: Catalogue, *, name: str, company: str = "", phone: str, email: str = "", notes: str = "", rows: list[dict],
+                  wishes: list[dict] | None = None):
+    """
+    A quotation written from the client's picks: sent at once, or a draft for the team to review. `wishes` are things the
+    client described because they weren't in the catalogue; they come in unpriced, so the quotation always waits for review.
+    """
     from apps.quotations import services as quotes
     from apps.quotations.models import Quotation
 
-    if not rows:
-        raise BusinessRuleError("Pick at least one item.")
+    wishes = [w for w in (wishes or []) if str(w.get("description") or "").strip()]
+    if not rows and not wishes:
+        raise BusinessRuleError("Pick at least one item, or describe what you need.")
+    if len(wishes) > MAX_WISHES:
+        raise BusinessRuleError(f"Describe up to {MAX_WISHES} things you can't find.")
     if len(rows) > MAX_LINES:
         raise BusinessRuleError(f"A request can have up to {MAX_LINES} items.")
     name, company, email = name.strip(), company.strip(), email.strip()
@@ -135,14 +142,8 @@ def request_quote(catalogue: Catalogue, *, name: str, company: str = "", phone: 
         raise BusinessRuleError("Enter your name and phone number.")
     wanted: dict[str, Decimal] = {}
     for row in rows:
-        try:
-            quantity = Decimal(str(row.get("quantity") or 0))
-        except ArithmeticError as exc:
-            raise BusinessRuleError("Enter quantities as numbers.") from exc
-        if quantity <= 0 or quantity > MAX_QTY:
-            raise BusinessRuleError("Each quantity must be more than zero and at most 100,000.")
         pid = str(row.get("product_id"))
-        wanted[pid] = wanted.get(pid, ZERO) + quantity
+        wanted[pid] = wanted.get(pid, ZERO) + _quantity(row)
     offered = {str(p.pk): p for p in products_of(catalogue).filter(pk__in=[k for k in wanted if _is_uuid(k)])}
     if len(offered) != len(wanted):
         raise BusinessRuleError("Something you picked is no longer in this catalogue. Refresh the page and try again.")
@@ -158,10 +159,15 @@ def request_quote(catalogue: Catalogue, *, name: str, company: str = "", phone: 
 
     # the prices the client saw, even if the customer they matched has a price list of their own
     lines = [{"product": offered[pid], "quantity": qty, "unit_price": price_for(offered[pid], price_list)} for pid, qty in wanted.items()]
+    lines += [{"description": f"{str(w['description']).strip()[:200]} (not in the catalogue: price it)", "quantity": _quantity(w), "unit_price": ZERO}
+              for w in wishes]
+    reviews_first = catalogue.reviews_first or bool(wishes)
     who = ", ".join(x for x in (name, company, phone.strip(), email) if x)
     note = f"Requested through the catalogue \"{catalogue.name}\" by {who}."
     if notes.strip():
         note += f"\n\nFrom the client: {notes.strip()[:2000]}"
+    if wishes:
+        note += f"\n\nThe client described {len(wishes)} item(s) that aren't in the catalogue. Price them (or remove them) before sending."
     quotation = quotes.save(workspace, header={"customer": customer, "notes": note}, rows=lines, user=catalogue.created_by)
     quotation.catalogue, quotation.public_token = catalogue, secrets.token_urlsafe(18)
     quotation.contact_email = email or customer.email
@@ -170,13 +176,24 @@ def request_quote(catalogue: Catalogue, *, name: str, company: str = "", phone: 
         lead.interest = f"Quotation {quotation.number} from {catalogue.name}"[:255]
         lead.estimated_value = quotation.total
         lead.save(update_fields=["interest", "estimated_value", "updated_at"])
-    if not catalogue.reviews_first:
+    if not reviews_first:
         quotes.change_status(quotation, "send")  # emails the client their link
     _tell_team(quotation, f"New quote request: {quotation.number} from {who}",
-               f"{who} picked {len(lines)} item(s) from \"{catalogue.name}\".\n\n"
-               + ("The quotation was sent to them." if not catalogue.reviews_first else "It is a draft: review it and send it.")
+               f"{who} picked {len(wanted)} item(s) from \"{catalogue.name}\""
+               + (f" and described {len(wishes)} they couldn't find" if wishes else "") + ".\n\n"
+               + ("The quotation was sent to them." if not reviews_first else "It is a draft: review it and send it.")
                + f"\n\nOpen it: {_staff_link(quotation)}")
     return Quotation.objects.get(pk=quotation.pk)
+
+
+def _quantity(row: dict) -> Decimal:
+    try:
+        quantity = Decimal(str(row.get("quantity") or 0))
+    except ArithmeticError as exc:
+        raise BusinessRuleError("Enter quantities as numbers.") from exc
+    if quantity <= 0 or quantity > MAX_QTY:
+        raise BusinessRuleError("Each quantity must be more than zero and at most 100,000.")
+    return quantity
 
 
 def _is_uuid(value: str) -> bool:
@@ -317,3 +334,43 @@ def send_link(catalogue: Catalogue, *, to: list[str], message: str, user=None) -
     reply_to = [x for x in (catalogue.workspace.email, getattr(user, "email", "")) if x][:1]
     pk = str(catalogue.pk)
     transaction.on_commit(lambda: send_catalogue_link.delay(pk, to, message, reply_to))
+
+
+# ---------------------------------------------------------------- the catalogue as a PDF
+MAX_PDF_ITEMS = 300
+
+
+def pdf(catalogue: Catalogue) -> bytes:
+    """The catalogue to print or attach: products by category, and the link (with a QR code) to pick and get the quotation."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    import segno
+    from django.template.loader import render_to_string
+
+    from apps.documentemails import pdfs
+
+    def html() -> str:
+        rows = items(catalogue)[:MAX_PDF_ITEMS]
+        with ThreadPoolExecutor(max_workers=8) as pool:  # pictures are fetched once, in parallel
+            pictures = list(pool.map(pdfs.image_data, [r["image_url"] for r in rows]))
+        groups: dict[str, list] = {}
+        for r, picture in zip(rows, pictures, strict=True):
+            vat = Decimal(r["vat_percent"])
+            groups.setdefault(r["category"], []).append({
+                **r, "image": picture, "price_text": f"{Decimal(r['price']):,.2f}" if r["price"] is not None else "",
+                "vat_text": f"{vat.normalize():f}" if vat else "",
+            })
+        ws = catalogue.workspace
+        return render_to_string("pdf/catalogue.html", {
+            "name": catalogue.name, "intro": catalogue.intro, "business": business_of(ws), "logo": pdfs.image_data(ws.logo_url),
+            "customer_name": catalogue.customer.name if catalogue.customer_id else "", "today": timezone.localdate(),
+            "expires_on": catalogue.expires_on, "url": catalogue.url, "qr": segno.make(catalogue.url, error="m").svg_data_uri(scale=4, border=1),
+            "reviews_first": catalogue.reviews_first, "show_prices": catalogue.show_prices, "currency": ws.currency,
+            "groups": [{"name": k, "items": v} for k, v in sorted(groups.items(), key=lambda kv: (kv[0] == "", kv[0]))],
+        })
+
+    return pdfs.print_html(html, f"catalogue {catalogue.pk}")
+
+
+def pdf_filename(catalogue: Catalogue) -> str:
+    return f"{catalogue.name}.pdf".replace("/", "-").replace('"', "")

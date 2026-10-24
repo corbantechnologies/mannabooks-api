@@ -144,20 +144,30 @@ def html_for(workspace, doc_type: str, document) -> str:
 
 
 def render(workspace, doc_type: str, document) -> bytes:
+    return print_html(lambda: html_for(workspace, doc_type, document), f"{doc_type} {document.pk}")
+
+
+def print_html(make_html, what: str) -> bytes:
+    """Any page of HTML (everything inlined) as an A4 PDF, with whichever engine is set up."""
     if not enabled():
         raise BusinessRuleError("PDF downloads aren't set up yet. Use Print and choose Save as PDF.")
-    html = html_for(workspace, doc_type, document)
+    html = make_html()
     if settings.PDF_ENGINE == "service":
         pdf = _print_by_service(html)
     else:
         try:
             pdf = _print_here(html)
         except Exception:  # noqa: BLE001 - a browser crash or timeout must not become a 500
-            logger.exception("Chromium couldn't print %s %s", doc_type, document.pk)
+            logger.exception("Chromium couldn't print %s", what)
             pdf = b""
     if not pdf.startswith(b"%PDF"):
         raise BusinessRuleError("The PDF couldn't be made. Try again, or use Print.")
     return pdf
+
+
+def image_data(url: str) -> str:
+    """A picture as a data URI, for pages printed offline."""
+    return _image(url)
 
 
 def filename(doc_type: str, document) -> str:

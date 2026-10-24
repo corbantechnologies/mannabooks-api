@@ -13,6 +13,7 @@ from .serializers import (
     AgedReportSerializer,
     BalanceSheetSerializer,
     CategoryReportSerializer,
+    GlanceSerializer,
     PeriodSummarySerializer,
     ProfitAndLossByDimensionSerializer,
     ProfitAndLossSerializer,
@@ -183,3 +184,15 @@ class CategoryReportView(WorkspaceScopedMixin, generics.GenericAPIView):
         deny_if_limited(request, "The category report")
         start, end = _range(request)
         return Response(CategoryReportSerializer(services.by_category(request.workspace, from_date=start, to_date=end)).data)
+
+
+class GlanceView(WorkspaceScopedMixin, generics.GenericAPIView):
+    """The business at a glance: sales this month, quotes waiting, money owed and coming due, cash. Parts follow permissions."""
+
+    permission_map = {"GET": None}
+    serializer_class = GlanceSerializer
+
+    def get(self, request, workspace):
+        from .glance import glance
+
+        return Response(GlanceSerializer(glance(request)).data)
