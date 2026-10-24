@@ -9,6 +9,7 @@ PDF_ENGINE picks the printer:
 import base64
 import functools
 import logging
+import os
 
 import requests
 from django.conf import settings
@@ -44,8 +45,9 @@ def _chromium_installed() -> bool:
         with sync_playwright() as p:
             p.chromium.launch(args=CHROMIUM_ARGS).close()  # the headless shell has no executable_path of its own: try it
             return True
-    except Exception:  # noqa: BLE001 - no Playwright, or no browser: PDFs are simply off
-        logger.warning("Chromium for Playwright isn't installed; PDF downloads are off")
+    except Exception as exc:  # noqa: BLE001 - no Playwright, or no browser: PDFs are simply off
+        logger.warning("Chromium can't start, so PDF downloads are off (browsers path %s): %s",
+                       os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "default"), exc)
         return False
 
 

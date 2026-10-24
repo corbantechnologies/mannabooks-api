@@ -26,3 +26,6 @@ schema.yml
 .idea/
 .DS_Store
 Thumbs.db
+
+# Chromium for PDFs (installed by build.sh)
+.playwright/
