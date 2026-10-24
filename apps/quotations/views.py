@@ -9,7 +9,7 @@ from apps.core.tenancy import WorkspaceScopedMixin, workspace_object
 
 from . import services
 from .models import Quotation
-from .serializers import ConvertedSerializer, QuotationActionSerializer, QuotationSerializer
+from .serializers import ConvertedSerializer, QuotationActionSerializer, QuotationSerializer, ShareLinkSerializer
 
 
 class QuotationMixin(WorkspaceScopedMixin):
@@ -33,7 +33,7 @@ class QuotationMixin(WorkspaceScopedMixin):
 
 
 class QuotationListCreateView(QuotationMixin, generics.ListCreateAPIView):
-    filterset_fields = {"status": ["exact"], "customer": ["exact"], "issue_date": ["gte", "lte"]}
+    filterset_fields = {"status": ["exact"], "customer": ["exact"], "catalogue": ["exact"], "issue_date": ["gte", "lte"]}
     search_fields = ["number", "customer__name", "reference"]
     ordering_fields = ["issue_date", "number", "total"]
 
@@ -89,3 +89,23 @@ class QuotationConvertView(QuotationMixin, generics.GenericAPIView):
         invoice = services.convert(self.quotation(), request.user)
         audit.record(request, "create", invoice)
         return Response({"invoice_id": str(invoice.id)}, status=status.HTTP_201_CREATED)
+
+
+class QuotationShareView(QuotationMixin, generics.GenericAPIView):
+    """A private link where the customer sees the quotation and accepts or declines it."""
+
+    permission_map = {"POST": "quotations.manage"}
+    serializer_class = ShareLinkSerializer
+
+    @extend_schema(request=None, responses={200: ShareLinkSerializer})
+    def post(self, request, workspace, pk):
+        import secrets
+
+        from apps.catalogues.services import public_url
+
+        quotation = self.quotation()
+        if not quotation.public_token:
+            quotation.public_token = secrets.token_urlsafe(18)
+            quotation.save(update_fields=["public_token", "updated_at"])
+            audit.record(request, "other", quotation, {"shared": True})
+        return Response({"url": public_url(quotation)})

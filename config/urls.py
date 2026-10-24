@@ -36,6 +36,7 @@ workspace_patterns = [
     path("units/", include("apps.units.urls")),
     path("price-lists/", include("apps.pricelists.urls")),
     path("quotations/", include("apps.quotations.urls")),
+    path("catalogues/", include("apps.catalogues.urls")),
     path("invoices/", include("apps.invoices.urls")),
     path("payments/", include("apps.payments.urls")),
     path("receipts/", include("apps.receipts.urls")),
@@ -113,6 +114,7 @@ urlpatterns = [
     path("api/v1/hooks/pay/", include("apps.mpesatransactions.urls_hooks")),  # Safaricom callbacks
     path("api/v1/portal/", include("apps.portallinks.urls_public")),  # customers, no sign-in
     path("api/v1/store/", include("apps.onlineorders.urls_public")),  # the public online shop
+    path("api/v1/shared/", include("apps.catalogues.urls_public")),  # shared catalogues and quote links
     path("api/v1/w/<slug:workspace>/", include(workspace_patterns)),
     path("api/v1/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/v1/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="api-docs"),

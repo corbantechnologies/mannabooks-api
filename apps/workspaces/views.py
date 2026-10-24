@@ -6,6 +6,7 @@ from rest_framework.response import Response
 from apps.auditlogs import services as audit
 from apps.core.exceptions import BusinessRuleError
 from apps.core.tenancy import WorkspacePermission
+from apps.documentemails.pdfs import enabled as pdfs_enabled
 from apps.taxrates.services import match_default_to_vat_status
 
 from . import services
@@ -106,7 +107,7 @@ class WorkspaceContextView(generics.GenericAPIView):
             "online_orders_new": OnlineOrder.objects.filter(workspace=request.workspace, status="new").count()
             if request.membership.has_perm("onlineorders.view") else 0,
             "goal_catalog": [{"key": k, **v} for k, v in GOALS.items()],
-            "pdf_enabled": bool(settings.PDF_SERVICE_URL and settings.PDF_SERVICE_KEY),
+            "pdf_enabled": pdfs_enabled(),
             "blocked": bool(request.workspace.blocked_at),
             "blocked_reason": request.workspace.blocked_reason,
             "limited_department": _limit(request),

@@ -91,7 +91,7 @@ def test_pdf_download_and_attachment(api, ws, day, settings, monkeypatch, mailou
         sent_html["html"], sent_html["key"] = json["html"], headers["X-Render-Key"]
         return Fake()
 
-    settings.PDF_SERVICE_URL, settings.PDF_SERVICE_KEY = "http://pdf.internal", "secret"
+    settings.PDF_ENGINE, settings.PDF_SERVICE_URL, settings.PDF_SERVICE_KEY = "service", "http://pdf.internal", "secret"
     monkeypatch.setattr(requests, "post", fake_post)
     pdf = api.get(url(ws, "document-emails/pdf/"), doc)
     assert pdf.status_code == 200 and pdf["Content-Type"] == "application/pdf" and pdf.content.startswith(b"%PDF")

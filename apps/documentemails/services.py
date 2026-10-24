@@ -57,6 +57,15 @@ def _addresses(text: str) -> list[str]:
 
 
 def _link(workspace, doc_type: str, document) -> str:
+    if doc_type == "quotation":  # where the customer sees it and accepts it
+        import secrets
+
+        from apps.catalogues.services import public_url
+
+        if not document.public_token:
+            document.public_token = secrets.token_urlsafe(18)
+            document.save(update_fields=["public_token", "updated_at"])
+        return public_url(document)
     if doc_type != "invoice" or document.balance_due <= 0:
         return ""
     from apps.portallinks.models import PortalLink
@@ -88,8 +97,9 @@ def _body(workspace, doc_type: str, document, message: str, link: str) -> tuple[
         text += ["", f"Total {currency} {_money(amount)}"]
     if doc_type == "invoice":
         text.append(f"Balance due {currency} {_money(document.balance_due)} by {document.due_date:%d %b %Y}")
+    action = "View and accept online" if doc_type == "quotation" else "View and pay online"
     if link:
-        text += ["", f"View and pay online: {link}"]
+        text += ["", f"{action}: {link}"]
     if pay:
         text += ["", "How to pay:"] + ["  " + " | ".join(o) for o in pay]
     text += ["", f"{business}" + (f" · {contact}" if contact else ""), "Sent with MannaBooks"]
@@ -110,7 +120,7 @@ def _body(workspace, doc_type: str, document, message: str, link: str) -> tuple[
         + (f"<p style='text-align:right;margin:0 8px'>Balance due {escape(currency)} {_money(document.balance_due)} by {document.due_date:%d %b %Y}</p>"
            if doc_type == "invoice" else "")
         + (f"<p style='margin:20px 0'><a href='{escape(link)}' style='background:#065f46;color:#fff;padding:10px 16px;border-radius:6px;"
-           f"text-decoration:none'>View and pay online</a></p>" if link else "")
+           f"text-decoration:none'>{action}</a></p>" if link else "")
         + ("<p style='margin:16px 0 4px;font-weight:bold'>How to pay</p>" + "".join(f"<p style='margin:0 0 6px'>{'<br>'.join(escape(x) for x in o)}</p>" for o in pay)
            if pay else "")
         + f"<p style='margin:24px 0 0;color:#57534e'>{escape(business)}" + (f" · {escape(contact)}" if contact else "") + "</p>"

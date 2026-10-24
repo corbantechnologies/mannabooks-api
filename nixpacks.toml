@@ -2,3 +2,5 @@
 # does not pin it (local machines may run a newer Python).
 [variables]
 NIXPACKS_PYTHON_VERSION = "3.12"
+# Where build.sh installs Chromium for PDFs, and where the running services look for it.
+PLAYWRIGHT_BROWSERS_PATH = "/app/.playwright"
