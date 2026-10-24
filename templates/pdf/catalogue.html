@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ name }}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 10.5pt; color: #1c1917; margin: 0; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; }
+  .logo { max-height: 56px; max-width: 180px; margin-bottom: 6px; }
+  .biz { font-size: 15pt; font-weight: 700; margin: 0; }
+  .muted { color: #57534e; }
+  .small { font-size: 9pt; }
+  h1 { font-size: 20pt; margin: 0; text-align: right; }
+  .for { text-align: right; margin-top: 4px; }
+  .intro { margin: 18px 0 0; white-space: pre-line; }
+  .cta { display: flex; gap: 16px; align-items: center; border: 1.5px solid #065f46; border-radius: 8px; padding: 12px 14px; margin: 18px 0 8px;
+         page-break-inside: avoid; }
+  .cta img { width: 96px; height: 96px; flex: none; }
+  .cta .head { font-size: 12pt; font-weight: 700; color: #065f46; margin: 0 0 4px; }
+  .cta a { color: #065f46; word-break: break-all; font-weight: 600; }
+  table.items { width: 100%; border-collapse: collapse; margin-top: 10px; font-variant-numeric: tabular-nums; }
+  table.items th { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px; color: #57534e; text-align: left;
+                   border-bottom: 1.5px solid #1c1917; padding: 6px; }
+  table.items td { padding: 8px 6px; border-bottom: 1px solid #e7e5e4; vertical-align: top; }
+  table.items tr { page-break-inside: avoid; }
+  table.items th.r, table.items td.r { text-align: right; white-space: nowrap; padding-left: 14px; }
+  .pic { width: 64px; }
+  .pic img, .pic .none { width: 56px; height: 56px; border-radius: 6px; object-fit: cover; display: block; }
+  .pic .none { background: #f5f5f4; color: #a8a29e; font-size: 20pt; text-align: center; line-height: 56px; }
+  .name { font-weight: 600; }
+  .desc { color: #57534e; font-size: 9pt; margin-top: 2px; }
+  .cat { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px; color: #78716c; padding-top: 14px !important; border-bottom: none !important; }
+  .stock { font-size: 8.5pt; }
+  .in { color: #15803d; } .out { color: #b45309; }
+  .foot { margin-top: 22px; font-size: 8.5pt; color: #78716c; border-top: 1px solid #e7e5e4; padding-top: 8px; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div>
+      {% if logo %}<img class="logo" src="{{ logo }}" alt="">{% endif %}
+      <p class="biz">{{ business.name }}</p>
+      {% if business.address %}<div class="muted small">{{ business.address|linebreaksbr }}</div>{% endif %}
+      <div class="muted small">{% if business.phone %}{{ business.phone }}{% endif %}{% if business.phone and business.email %} · {% endif %}{% if business.email %}{{ business.email }}{% endif %}</div>
+    </div>
+    <div>
+      <h1>{{ name }}</h1>
+      <div class="for muted small">{% if customer_name %}Prepared for {{ customer_name }}<br>{% endif %}{{ today|date:"d M Y" }}{% if expires_on %} · open until {{ expires_on|date:"d M Y" }}{% endif %}</div>
+    </div>
+  </div>
+  {% if intro %}<p class="intro">{{ intro }}</p>{% endif %}
+
+  <div class="cta">
+    <img src="{{ qr }}" alt="">
+    <div>
+      <p class="head">Pick what you need online</p>
+      <div>Scan the code or open <a href="{{ url }}">{{ url }}</a>, choose quantities and {% if reviews_first %}send your list: we will reply with your quotation{% else %}get your quotation straight away{% endif %}. You can accept it there too.</div>
+    </div>
+  </div>
+
+  <table class="items">
+    <thead><tr><th class="pic"></th><th>Item</th><th class="r">Unit</th>{% if show_prices %}<th class="r">Price</th>{% endif %}</tr></thead>
+    <tbody>
+      {% for group in groups %}
+      {% if group.name and groups|length > 1 %}<tr><td class="cat" colspan="{% if show_prices %}4{% else %}3{% endif %}">{{ group.name }}</td></tr>{% endif %}
+      {% for i in group.items %}
+      <tr>
+        <td class="pic">{% if i.image %}<img src="{{ i.image }}" alt="">{% else %}<div class="none">{{ i.name|first|upper }}</div>{% endif %}</td>
+        <td>
+          <div class="name">{{ i.name }}</div>
+          {% if i.code %}<div class="desc">{{ i.code }}</div>{% endif %}
+          {% if i.description %}<div class="desc">{{ i.description|truncatechars:240 }}</div>{% endif %}
+          {% if i.in_stock is not None %}<div class="stock {% if i.in_stock %}in{% else %}out{% endif %}">{% if i.in_stock %}In stock{% else %}Out of stock{% endif %}</div>{% endif %}
+        </td>
+        <td class="r">{{ i.unit }}</td>
+        {% if show_prices %}<td class="r"><strong>{{ currency }} {{ i.price_text }}</strong>{% if i.vat_text %}<div class="desc">plus {{ i.vat_text }}% VAT</div>{% endif %}</td>{% endif %}
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if not show_prices %}<p class="muted small">Prices on request: pick what you need on the link above and we will send your quotation.</p>{% endif %}
+
+  <div class="foot"><span>{{ business.name }}</span><span>Made with MannaBooks · mannabooks.co.ke</span></div>
+</body>
+</html>

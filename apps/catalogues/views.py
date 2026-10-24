@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 
 from apps.auditlogs import services as audit
 from apps.core.tenancy import WorkspaceScopedMixin
+from apps.documentemails.pdfs import enabled as pdfs_enabled
 
 from . import services
 from .models import Catalogue
@@ -76,6 +77,22 @@ class CatalogueSendView(CatalogueMixin, generics.GenericAPIView):
         return Response(status=status.HTTP_202_ACCEPTED)
 
 
+def pdf_response(catalogue):
+    from django.http import HttpResponse
+
+    res = HttpResponse(services.pdf(catalogue), content_type="application/pdf")
+    res["Content-Disposition"] = f'inline; filename="{services.pdf_filename(catalogue)}"'
+    return res
+
+
+class CataloguePdfView(CatalogueMixin, generics.GenericAPIView):
+    """The catalogue as a PDF to print or send, with its link and a QR code."""
+
+    @extend_schema(responses={(200, "application/pdf"): OpenApiTypes.BINARY})
+    def get(self, request, workspace, pk):
+        return pdf_response(self.get_object())
+
+
 class CatalogueAnalyticsView(CatalogueMixin, generics.GenericAPIView):
     """Views, quote requests and wins per catalogue, and the products clients ask for most."""
 
@@ -103,8 +120,14 @@ class PublicCatalogueView(PublicMixin, APIView):
         Catalogue.objects.filter(pk=c.pk).update(view_count=F("view_count") + 1, last_viewed_at=timezone.now())
         data = {"name": c.name, "intro": c.intro, "business": services.business_of(c.workspace),
                 "customer_name": c.customer.name if c.customer_id else None, "show_prices": c.show_prices, "show_stock": c.show_stock,
-                "reviews_first": c.reviews_first, "expires_on": c.expires_on, "items": services.items(c)}
+                "reviews_first": c.reviews_first, "expires_on": c.expires_on, "pdf_available": pdfs_enabled(), "items": services.items(c)}
         return Response(PublicCatalogueSerializer(data).data)
+
+
+class PublicCataloguePdfView(PublicMixin, APIView):
+    @extend_schema(responses={(200, "application/pdf"): OpenApiTypes.BINARY})
+    def get(self, request, token):
+        return pdf_response(services.open_catalogue(token))
 
 
 class PublicQuoteRequestView(PublicMixin, APIView):
@@ -115,7 +138,7 @@ class PublicQuoteRequestView(PublicMixin, APIView):
         serializer.is_valid(raise_exception=True)
         d = serializer.validated_data
         q = services.request_quote(c, name=d["name"], company=d["company"], phone=d["phone"], email=d["email"], notes=d["notes"],
-                                   rows=[dict(r) for r in d["lines"]])
+                                   rows=[dict(r) for r in d["lines"]], wishes=[dict(w) for w in d["wishes"]])
         return Response({"token": q.public_token, "status": q.status}, status=status.HTTP_201_CREATED)
 
 

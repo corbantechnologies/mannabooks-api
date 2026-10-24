@@ -1,3 +1,5 @@
+import logging
+
 from celery import shared_task
 from django.conf import settings
 from django.core.mail import send_mail
@@ -32,6 +34,15 @@ def send_catalogue_link(self, catalogue_id: str, to: list[str], message: str, re
     sender = parseaddr(settings.DEFAULT_FROM_EMAIL)[1] or "no-reply@mannabooks.co.ke"
     msg = EmailMultiAlternatives(f"{c.name} from {business}", text, formataddr((f"{c.workspace.name} via MannaBooks", sender)), to, reply_to=reply_to)
     msg.attach_alternative(html, "text/html")
+    from apps.documentemails import pdfs
+
+    if pdfs.enabled():  # the catalogue as a PDF too; if it can't be made, the email still goes with the link
+        from . import services
+
+        try:
+            msg.attach(services.pdf_filename(c), services.pdf(c), "application/pdf")
+        except Exception:  # noqa: BLE001
+            logging.getLogger("mannabooks.pdf").exception("Catalogue PDF for %s failed", c.pk)
     try:
         msg.send()
     except Exception as exc:  # noqa: BLE001 - retry on any mail failure

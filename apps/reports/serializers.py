@@ -211,3 +211,84 @@ class CategoryReportSerializer(serializers.Serializer):
     rows = CategoryRowSerializer(many=True)
     total_sales = serializers.DecimalField(**M)
     total_stock_value = serializers.DecimalField(**M)
+
+
+class GlanceDocSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    kind = serializers.CharField()
+    number = serializers.CharField()
+    party = serializers.CharField()
+    date = serializers.DateField()
+    days = serializers.IntegerField(help_text="Days until the date; negative is overdue")
+    amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    currency = serializers.CharField()
+
+
+class GlanceSalesSerializer(serializers.Serializer):
+    this_month = serializers.DecimalField(max_digits=18, decimal_places=2)
+    last_month = serializers.DecimalField(max_digits=18, decimal_places=2)
+    last_month_to_date = serializers.DecimalField(max_digits=18, decimal_places=2)
+    change_percent = serializers.FloatField(allow_null=True)
+    collected = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+    month_label = serializers.CharField()
+    last_month_label = serializers.CharField()
+
+
+class GlanceQuotesSerializer(serializers.Serializer):
+    open_count = serializers.IntegerField()
+    open_value = serializers.DecimalField(max_digits=18, decimal_places=2)
+    sent_count = serializers.IntegerField()
+    draft_count = serializers.IntegerField()
+    to_review_count = serializers.IntegerField()
+    expiring_count = serializers.IntegerField()
+    expiring_value = serializers.DecimalField(max_digits=18, decimal_places=2)
+    accepted_count = serializers.IntegerField()
+    accepted_value = serializers.DecimalField(max_digits=18, decimal_places=2)
+    list = GlanceDocSerializer(many=True)
+
+
+class GlanceDebtorSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    amount = serializers.DecimalField(max_digits=18, decimal_places=2)
+    count = serializers.IntegerField()
+
+
+class GlanceOwedSerializer(serializers.Serializer):
+    total = serializers.DecimalField(max_digits=18, decimal_places=2)
+    count = serializers.IntegerField()
+    overdue = serializers.DecimalField(max_digits=18, decimal_places=2)
+    overdue_count = serializers.IntegerField()
+    due_soon = serializers.DecimalField(max_digits=18, decimal_places=2)
+    due_soon_count = serializers.IntegerField()
+    draft_count = serializers.IntegerField()
+    list = GlanceDocSerializer(many=True)
+
+
+class GlanceReceivablesSerializer(GlanceOwedSerializer):
+    top_overdue = GlanceDebtorSerializer(many=True)
+
+
+class GlancePayablesSerializer(GlanceOwedSerializer):
+    vouchers_waiting = serializers.IntegerField(allow_null=True)
+    vouchers_waiting_value = serializers.DecimalField(max_digits=18, decimal_places=2, allow_null=True)
+
+
+class GlanceCashAccountSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    balance = serializers.DecimalField(max_digits=18, decimal_places=2)
+
+
+class GlanceCashSerializer(serializers.Serializer):
+    total = serializers.DecimalField(max_digits=18, decimal_places=2)
+    accounts = GlanceCashAccountSerializer(many=True)
+
+
+class GlanceSerializer(serializers.Serializer):
+    """Each part is null when the person may not see it."""
+
+    today = serializers.DateField()
+    sales = GlanceSalesSerializer(allow_null=True)
+    quotes = GlanceQuotesSerializer(allow_null=True)
+    receivables = GlanceReceivablesSerializer(allow_null=True)
+    payables = GlancePayablesSerializer(allow_null=True)
+    cash = GlanceCashSerializer(allow_null=True)

@@ -142,3 +142,39 @@ def test_email_the_link(api, ws, tech, mailoutbox, django_capture_on_commit_call
         res = api.post(url(ws, f"catalogues/{cat['id']}/send/"), {"to": ["buyer@acme.example"], "message": "Hello, our laptops."}, format="json")
     assert res.status_code == 202, res.data
     assert mailoutbox[-1].to == ["buyer@acme.example"] and cat["url"] in mailoutbox[-1].body
+
+
+def test_client_describes_what_they_cant_find(api, ws, tech):  # noqa: F811
+    cat = make(api, ws, category_ids=[tech["laptops"]["id"]])  # sends quotes at once, but not ones with unpriced items
+    token = cat["url"].rsplit("/", 1)[1]
+    base = {"name": "Kamau", "phone": "0700111222"}
+    assert public.post(f"/api/v1/shared/catalogues/{token}/quote/", base, format="json").status_code == 409  # nothing asked for
+    res = public.post(f"/api/v1/shared/catalogues/{token}/quote/", {**base, "lines": [{"product_id": tech["book"]["id"], "quantity": "1"}],
+                      "wishes": [{"description": "Laptop bag, 15 inch", "quantity": "2"}, {"description": "  "}]}, format="json")
+    assert res.status_code == 201 and res.data["status"] == "draft", res.data
+    from apps.quotations.models import Quotation
+
+    q = Quotation.objects.get(public_token=res.data["token"])
+    lines = list(q.lines.order_by("line_no"))
+    assert len(lines) == 2 and lines[1].product_id is None and lines[1].unit_price == 0 and lines[1].quantity == 2
+    assert "Laptop bag" in lines[1].description and "aren't in the catalogue" in q.notes
+    only = public.post(f"/api/v1/shared/catalogues/{token}/quote/", {**base, "wishes": [{"description": "Docking station"}]}, format="json")
+    assert only.status_code == 201 and only.data["status"] == "draft"
+
+
+def test_catalogue_pdf_carries_the_link(api, ws, tech, settings, monkeypatch):  # noqa: F811
+    from apps.documentemails import pdfs
+
+    cat = make(api, ws, category_ids=[tech["laptops"]["id"]])
+    token = cat["url"].rsplit("/", 1)[1]
+    assert api.get(url(ws, f"catalogues/{cat['id']}/pdf/")).status_code == 409  # PDFs off in tests
+    printed = {}
+    settings.PDF_ENGINE = "playwright"
+    monkeypatch.setattr(pdfs, "_chromium_installed", lambda: True)
+    monkeypatch.setattr(pdfs, "_print_here", lambda html: printed.setdefault("html", html) and b"%PDF-1.7 fake")
+    res = api.get(url(ws, f"catalogues/{cat['id']}/pdf/"))
+    assert res.status_code == 200 and res["Content-Type"] == "application/pdf" and "Laptops.pdf" in res["Content-Disposition"]
+    html = printed["html"]
+    assert cat["url"] in html and "data:image/svg+xml" in html and "ThinkPad X1" in html and "Pixel 9" not in html
+    assert "100,000.00" in html and "plus 16% VAT" in html
+    assert public.get(f"/api/v1/shared/catalogues/{token}/pdf/").status_code == 200
