@@ -13,7 +13,7 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         model = Workspace
         fields = [
             "id", "name", "slug", "legal_name", "kra_pin", "vat_registered", "vat_number", "currency",
-            "country", "timezone", "phone", "email", "address", "logo_url", "fiscal_year_start_month",
+            "country", "timezone", "phone", "email", "address", "logo_url", "fiscal_year_start_month", "fiscal_year_confirmed",
             "modules", "business_goal", "store_enabled", "store_intro", "store_allow_pickup", "store_allow_delivery", "store_delivery_fee",
             "store_pay_on_delivery", "group_id", "group_name", "created_at",
         ]
@@ -45,6 +45,8 @@ class WorkspaceSerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance, validated_data):
+        if "fiscal_year_start_month" in validated_data:  # choosing the month is checking it
+            validated_data["fiscal_year_confirmed"] = True
         month_changed = "fiscal_year_start_month" in validated_data and validated_data["fiscal_year_start_month"] != instance.fiscal_year_start_month
         instance = super().update(instance, validated_data)
         if month_changed:
