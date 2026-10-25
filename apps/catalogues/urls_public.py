@@ -7,5 +7,6 @@ urlpatterns = [
     path("catalogues/<str:token>/pdf/", views.PublicCataloguePdfView.as_view(), name="public-catalogue-pdf"),
     path("catalogues/<str:token>/quote/", views.PublicQuoteRequestView.as_view(), name="public-catalogue-quote"),
     path("quotes/<str:token>/", views.PublicQuoteView.as_view(), name="public-quote"),
+    path("quotes/<str:token>/pdf/", views.PublicQuotePdfView.as_view(), name="public-quote-pdf"),
     path("quotes/<str:token>/answer/", views.PublicQuoteAnswerView.as_view(), name="public-quote-answer"),
 ]

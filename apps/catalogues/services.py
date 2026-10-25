@@ -227,12 +227,19 @@ def quote_data(q) -> dict:
         "number": q.number, "status": q.status, "ready": ready, "issue_date": q.issue_date, "valid_until": q.valid_until,
         "is_expired": q.status in ("draft", "sent") and q.valid_until < timezone.localdate(),
         "currency": q.currency, "prices_include_tax": q.prices_include_tax, "catalogue_token": q.catalogue.token if q.catalogue_id else None,
+        "pdf_available": ready and _pdfs_enabled(),
         "subtotal": str(q.subtotal) if ready else None, "tax_total": str(q.tax_total) if ready else None, "total": str(q.total) if ready else None,
         "lines": [{"description": ln.description, "quantity": str(ln.quantity), "unit": ln.unit or (ln.product.unit if ln.product_id else ""),
                    "unit_price": str(ln.unit_price) if ready else None, "tax_rate_name": ln.tax_rate.name if ln.tax_rate else None,
                    "total_amount": str(ln.total_amount) if ready else None}
                   for ln in q.lines.select_related("tax_rate", "product")],
     }
+
+
+def _pdfs_enabled() -> bool:
+    from apps.documentemails.pdfs import enabled
+
+    return enabled()
 
 
 def answer(q, action: str):

@@ -178,3 +178,21 @@ def test_catalogue_pdf_carries_the_link(api, ws, tech, settings, monkeypatch):  
     assert cat["url"] in html and "data:image/svg+xml" in html and "ThinkPad X1" in html and "Pixel 9" not in html
     assert "100,000.00" in html and "plus 16% VAT" in html
     assert public.get(f"/api/v1/shared/catalogues/{token}/pdf/").status_code == 200
+
+
+def test_customer_downloads_the_quote_pdf(api, ws, tech, settings, monkeypatch):  # noqa: F811
+    from apps.documentemails import pdfs
+
+    cust = api.post(url(ws, "customers/"), {"name": "Walk-in Co"}, format="json").data
+    quote = api.post(url(ws, "quotations/"), {"customer_id": cust["id"], "lines": [{"product_id": tech["book"]["id"], "quantity": "1"}]}, format="json").data
+    token = api.post(url(ws, f"quotations/{quote['id']}/share/")).data["url"].rsplit("/", 1)[1]
+    settings.PDF_ENGINE = "playwright"
+    monkeypatch.setattr(pdfs, "_chromium_installed", lambda: True)
+    monkeypatch.setattr(pdfs, "_print_here", lambda html: b"%PDF-1.7 fake")
+    assert public.get(f"/api/v1/shared/quotes/{token}/").data["pdf_available"] is False  # a draft: prices not shown yet
+    assert public.get(f"/api/v1/shared/quotes/{token}/pdf/").status_code == 409
+    assert api.get(url(ws, "document-emails/pdf/"), {"document_type": "quotation", "object_id": quote["id"]}).status_code == 200  # staff can, even as a draft
+    api.post(url(ws, f"quotations/{quote['id']}/status/"), {"action": "send"}, format="json")
+    assert public.get(f"/api/v1/shared/quotes/{token}/").data["pdf_available"] is True
+    res = public.get(f"/api/v1/shared/quotes/{token}/pdf/")
+    assert res.status_code == 200 and res["Content-Type"] == "application/pdf" and quote["number"] in res["Content-Disposition"]

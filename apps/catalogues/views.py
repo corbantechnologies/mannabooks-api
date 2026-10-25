@@ -148,6 +148,24 @@ class PublicQuoteView(PublicMixin, APIView):
         return Response(SharedQuoteSerializer(services.quote_data(services.open_quote(token))).data)
 
 
+class PublicQuotePdfView(PublicMixin, APIView):
+    """The quotation as a PDF, for the customer to download from their link."""
+
+    @extend_schema(responses={(200, "application/pdf"): OpenApiTypes.BINARY})
+    def get(self, request, token):
+        from django.http import HttpResponse
+
+        from apps.core.exceptions import BusinessRuleError
+        from apps.documentemails import pdfs
+
+        q = services.open_quote(token)
+        if q.status == "draft":
+            raise BusinessRuleError("The business is still preparing this quotation.")
+        res = HttpResponse(pdfs.render(q.workspace, "quotation", q), content_type="application/pdf")
+        res["Content-Disposition"] = f'inline; filename="{pdfs.filename("quotation", q)}"'
+        return res
+
+
 class PublicQuoteAnswerView(PublicMixin, APIView):
     @extend_schema(request=SharedQuoteAnswerSerializer, responses={200: SharedQuoteSerializer})
     def post(self, request, token):

@@ -111,6 +111,16 @@ def _lines(doc_type, document, spec):
     return [{"description": d, "quantity": q, "price": "", "tax": "", "amount": _money(a)} for d, q, a in spec.rows(document)], False
 
 
+def _pay_rows(lines: list[str]) -> dict:
+    """One payment option as a small card: its first line is the heading (kind "M-Pesa paybill", name "247247"), the rest label and value rows."""
+    rows = []
+    for line in lines:
+        label, sep, value = line.partition(": ")
+        rows.append({"label": label, "value": value} if sep else {"label": "", "value": line})
+    head, rest = (rows[0], rows[1:]) if rows else ({"label": "", "value": ""}, [])
+    return {"kind": head["label"], "name": head["value"], "rows": rest}
+
+
 def html_for(workspace, doc_type: str, document) -> str:
     from apps.paymentoptions.models import PaymentOption
 
@@ -121,7 +131,8 @@ def html_for(workspace, doc_type: str, document) -> str:
     total = spec.total(document)
     pay = []
     if doc_type in ("invoice", "quotation"):
-        pay = [[x.replace("the document number", document.number) for x in o.lines()] for o in PaymentOption.objects.filter(workspace=workspace, show_on_documents=True)]
+        pay = [_pay_rows([x.replace("the document number", document.number) for x in o.lines()])
+               for o in PaymentOption.objects.filter(workspace=workspace, show_on_documents=True)]
     context = {
         "title": spec.title(document), "number": document.number, "date": spec.date(document), "reference": getattr(document, "reference", ""),
         "second_date": getattr(document, second_field, None) if second_field else None, "second_label": second_label,

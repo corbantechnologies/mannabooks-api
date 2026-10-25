@@ -131,6 +131,7 @@ class SharedQuoteSerializer(serializers.Serializer):
     currency = serializers.CharField()
     prices_include_tax = serializers.BooleanField()
     catalogue_token = serializers.CharField(allow_null=True)
+    pdf_available = serializers.BooleanField()
     subtotal = serializers.CharField(allow_null=True)
     tax_total = serializers.CharField(allow_null=True)
     total = serializers.CharField(allow_null=True)
