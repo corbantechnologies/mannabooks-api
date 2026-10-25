@@ -30,6 +30,13 @@
   .totals td { padding: 4px 6px; }
   .totals .grand td { border-top: 1.5px solid #1c1917; font-weight: 700; font-size: 12pt; }
   .box { border: 1px solid #e7e5e4; border-radius: 6px; padding: 10px 12px; margin-top: 16px; page-break-inside: avoid; }
+  .pay { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 6px; }
+  .option { page-break-inside: avoid; }
+  .option-kind { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px; color: #78716c; }
+  .option-name { font-weight: 700; margin: 1px 0 3px; font-variant-numeric: tabular-nums; }
+  .option-rows { border-collapse: collapse; font-size: 9.5pt; }
+  .option-rows td { padding: 1px 10px 1px 0; vertical-align: top; }
+  .option-rows td:last-child { font-variant-numeric: tabular-nums; }
   .etims { display: flex; gap: 14px; align-items: center; }
   .etims img { width: 92px; height: 92px; }
   .foot { margin-top: 26px; font-size: 8.5pt; color: #78716c; border-top: 1px solid #e7e5e4; padding-top: 8px; display: flex; justify-content: space-between; }
@@ -97,7 +104,17 @@
   {% if pay %}
   <div class="box">
     <div class="label">How to pay</div>
-    {% for option in pay %}<div class="small">{{ option|join:" · " }}</div>{% endfor %}
+    <div class="pay">
+      {% for option in pay %}
+      <div class="option">
+        {% if option.kind %}<div class="option-kind">{{ option.kind }}</div>{% endif %}
+        <div class="option-name">{{ option.name }}</div>
+        <table class="option-rows">
+          {% for row in option.rows %}<tr>{% if row.label %}<td class="muted">{{ row.label }}</td><td>{{ row.value }}</td>{% else %}<td colspan="2" class="muted">{{ row.value }}</td>{% endif %}</tr>{% endfor %}
+        </table>
+      </div>
+      {% endfor %}
+    </div>
   </div>
   {% endif %}
 
